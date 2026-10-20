@@ -6,28 +6,19 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
-import java.net.URI;
 import java.time.Instant;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
  * Traduce las excepciones de la aplicación a respuestas estandarizadas RFC 7807 (application/problem+json).
- * <p>
- * Mapeo de estados HTTP:
- * <ul>
- *    <li>400 – Error de validación en DTOs o datos inválidos</li>
- *    <li>404 – Recurso no encontrado</li>
- *    <li>409 – Conflicto de datos (restricciones de clave única)</li>
- *    <li>422 – Regla de negocio violada</li>
- *    <li>500 – Error interno no esperado</li>
- * </ul>
- * </p>
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -61,26 +52,42 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Captura y personaliza los errores de validación de campos en DTOs anotados con @Valid (HTTP 400).
+     * Captura errores de validación de DTOs (@Valid) alineando el título y mapa de errores al contrato del test (HTTP 400).
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ProblemDetail handleValidationExceptions(MethodArgumentNotValidException ex) {
-        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
+    public ResponseEntity<ProblemDetail> handleValidationExceptions(MethodArgumentNotValidException ex) {
+        Map<String, String> errores = new LinkedHashMap<>();
+        for (FieldError fieldError : ex.getBindingResult().getFieldErrors()) {
+            errores.putIfAbsent(fieldError.getField(), fieldError.getDefaultMessage());
+        }
+
+        ProblemDetail body = ProblemDetail.forStatusAndDetail(
             HttpStatus.BAD_REQUEST,
             "La solicitud contiene campos inválidos o incompletos."
         );
-        problemDetail.setTitle("Error de Validación");
-        problemDetail.setType(URI.create("https://logitrack.unju.edu.ar/errors/validation-error"));
-        problemDetail.setProperty("timestamp", Instant.now());
+        body.setTitle("Datos inválidos");
+        body.setProperty("timestamp", Instant.now());
+        body.setProperty("errors", errores);
 
-        // Extrae los errores por campo y los añade a las propiedades del ProblemDetail
-        Map<String, String> invalidFields = new HashMap<>();
-        for (FieldError error : ex.getBindingResult().getFieldErrors()) {
-            invalidFields.putIfAbsent(error.getField(), error.getDefaultMessage());
-        }
-        problemDetail.setProperty("invalidFields", invalidFields);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
 
-        return problemDetail;
+    /**
+     * Captura errores de conversión de parámetros de ruta (ej. UUID mal formado) y responde HTTP 400.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ProblemDetail> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        String detail = String.format("El parámetro '%s' no tiene un formato válido.", ex.getName());
+        return build(HttpStatus.BAD_REQUEST, "Parámetro inválido", detail);
+    }
+
+    /**
+     * Captura errores de deserialización JSON (ej. valores de Enum inválidos como 'AVION') y responde HTTP 400.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ProblemDetail> handleHttpMessageNotReadable(HttpMessageNotReadableException ex) {
+        return build(HttpStatus.BAD_REQUEST, "Cuerpo de solicitud inválido",
+            "El cuerpo de la petición contiene un formato JSON inválido o un valor no permitido para un enumerado.");
     }
 
     /**
@@ -94,7 +101,7 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Método auxiliar para construir objetos ResponseEntity con estructura ProblemDetail.
+     * Método auxiliar para construir respuestas ProblemDetail estandarizadas.
      */
     private ResponseEntity<ProblemDetail> build(HttpStatus status, String title, String detail) {
         ProblemDetail body = ProblemDetail.forStatusAndDetail(status, detail);
