@@ -1,0 +1,16 @@
+services:
+  # Servicio de la Base de Datos Relacional MySQL
+  mysqldb:
+    image: mysql:8.0                     # Imagen oficial de MySQL versión 8.0
+    container_name: logitrack-mysql       # Nombre del contenedor en Docker[cite: 6]
+    restart: always                       # Reinicio automático[cite: 6]
+    environment:
+      MYSQL_DATABASE: logitrack_db        # Base de datos inicial[cite: 6]
+      MYSQL_ROOT_PASSWORD: root           # Contraseña root[cite: 6]
+    ports:
+      - "3307:3306"                       # Puerto expuesto para conectar desde Spring Boot / Workbench[cite: 6]
+    volumes:
+      - db_data:/var/lib/mysql            # Volumen persistente para almacenar los datos[cite: 6]
+
+volumes:
+  db_data:                                # Declaración del volumen[cite: 6]
