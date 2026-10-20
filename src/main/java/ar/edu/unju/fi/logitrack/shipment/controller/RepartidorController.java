@@ -23,42 +23,86 @@ import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Controlador REST encargado de exponer las operaciones del módulo de repartidores bajo la ruta /api/v1/repartidores.
+ * <p>
+ * Incluye anotaciones de OpenAPI (Swagger) para la documentación interactiva de la API.
+ * </p>
+ */
 @RestController
 @RequestMapping("/api/v1/repartidores")
 @Tag(name = "Repartidores", description = "Alta y consulta del personal de entrega")
 public class RepartidorController {
 
+    // Dependencia del servicio inyectada por constructor
     private final RepartidorService repartidorService;
 
+    /**
+     * Inyección de dependencias mediante constructor (Buena práctica Spring).
+     *
+     * @param repartidorService Servicio con la lógica de negocio de repartidores.
+     */
     public RepartidorController(RepartidorService repartidorService) {
         this.repartidorService = repartidorService;
     }
 
+    /**
+     * POST /api/v1/repartidores - Registrar un nuevo repartidor en el sistema.
+     * <p>
+     * Todo repartidor nuevo se crea por defecto en estado ACTIVO.
+     * Devuelve el código HTTP 201 Created junto con el encabezado 'Location' apuntando al nuevo recurso.
+     * </p>
+     *
+     * @param request DTO validado con los datos para la alta del repartidor.
+     * @return ResponseEntity con el DTO RepartidorResponse y el encabezado Location.
+     */
     @PostMapping
     @Operation(summary = "Registrar un repartidor (queda ACTIVO)")
-    @ApiResponse(responseCode = "201", description = "Repartidor creado")
-    @ApiResponse(responseCode = "400", description = "Datos inválidos")
+    @ApiResponse(responseCode = "201", description = "Repartidor creado exitosamente")
+    @ApiResponse(responseCode = "400", description = "Datos de solicitud inválidos o incompletos")
     public ResponseEntity<RepartidorResponse> registrar(@Valid @RequestBody RepartidorRequest request) {
+        // Invoca el servicio para procesar el registro
         RepartidorResponse creado = repartidorService.registrar(request);
+
+        // Construcción dinámica de la URI para el encabezado 'Location' (ej. /api/v1/repartidores/{id})
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
-                .path("/{id}")
-                .buildAndExpand(creado.id())
-                .toUri();
+            .path("/{id}")
+            .buildAndExpand(creado.id())
+            .toUri();
+
         return ResponseEntity.created(location).body(creado);
     }
 
+    /**
+     * GET /api/v1/repartidores - Listar repartidores registrados.
+     * <p>
+     * Permite filtrar opcionalmente por el parámetro de consulta 'estado' (ACTIVO o INACTIVO).
+     * </p>
+     *
+     * @param estado Estado del repartidor para filtrar la lista (opcional).
+     * @return ResponseEntity con la lista de repartidores en formato DTO.
+     */
     @GetMapping
     @Operation(summary = "Listar repartidores, opcionalmente filtrando por estado")
-    public List<RepartidorResponse> listar(
-            @Parameter(description = "ACTIVO o INACTIVO") @RequestParam(required = false) EstadoRepartidor estado) {
-        return repartidorService.listar(estado);
+    public ResponseEntity<List<RepartidorResponse>> listar(
+        @Parameter(description = "Filtro por estado: ACTIVO o INACTIVO")
+        @RequestParam(required = false) EstadoRepartidor estado) {
+        List<RepartidorResponse> repartidores = repartidorService.listar(estado);
+        return ResponseEntity.ok(repartidores);
     }
 
+    /**
+     * GET /api/v1/repartidores/{id} - Obtener el detalle de un repartidor específico.
+     *
+     * @param id Identificador único (UUID) del repartidor a consultar.
+     * @return ResponseEntity con los datos del repartidor encontrado.
+     */
     @GetMapping("/{id}")
-    @Operation(summary = "Obtener el detalle de un repartidor")
+    @Operation(summary = "Obtener el detalle de un repartidor por su ID")
     @ApiResponse(responseCode = "200", description = "Repartidor encontrado")
-    @ApiResponse(responseCode = "404", description = "No existe un repartidor con ese id")
-    public RepartidorResponse obtener(@PathVariable UUID id) {
-        return repartidorService.obtenerPorId(id);
+    @ApiResponse(responseCode = "404", description = "No existe un repartidor con el ID especificado")
+    public ResponseEntity<RepartidorResponse> obtener(@PathVariable UUID id) {
+        RepartidorResponse repartidor = repartidorService.obtenerPorId(id);
+        return ResponseEntity.ok(repartidor);
     }
 }
