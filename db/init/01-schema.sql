@@ -5,6 +5,8 @@
 -- de MySQL (volumen vacío). Para re-ejecutarlo: docker compose down -v
 -- =====================================================================
 
+SET NAMES utf8mb4;
+
 CREATE DATABASE IF NOT EXISTS logitrack_shipments
     CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
