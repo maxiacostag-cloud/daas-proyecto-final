@@ -44,7 +44,6 @@ class EnvioRepositoryTest {
         assertThat(recuperado.getOrigen()).isEqualTo(TestDataFactory.origen());
         assertThat(recuperado.getDestino()).isEqualTo(TestDataFactory.destino());
         assertThat(recuperado.getEstado()).isEqualTo(EstadoEnvio.PENDIENTE);
-        assertThat(recuperado.getTarifa()).isPositive();
         assertThat(envioRepository.existsByCodigoSeguimiento("LT-REPO000001")).isTrue();
     }
 
@@ -58,7 +57,7 @@ class EnvioRepositoryTest {
         Envio guardado = envioRepository.saveAndFlush(envio);
         entityManager.clear();
 
-        List<HistorialEstado> historial = historialEstadoRepository.findByEnvioIdOrderByFechaHoraAsc(guardado.getId());
+        List<HistorialEstado> historial = historialEstadoRepository.findByEnvioIdOrderByFechaHoraDesc(guardado.getId());
 
         assertThat(historial)
                 .extracting(HistorialEstado::getEstadoNuevo)

@@ -10,9 +10,16 @@ import java.util.UUID;
 
 public interface EnvioRepository extends JpaRepository<Envio, UUID> {
 
-    Optional<Envio> findByCodigoSeguimiento(String codigoSeguimiento);
-
     boolean existsByCodigoSeguimiento(String codigoSeguimiento);
 
     List<Envio> findByEstadoOrderByCreatedAtDesc(EstadoEnvio estado);
+
+    /** Busca un envío por su código único de seguimiento público */
+    Optional<Envio> findByCodigoSeguimiento(String codigoSeguimiento);
+
+    /** Lista todos los envíos que se encuentran en un estado determinado */
+    List<Envio> findByEstado(EstadoEnvio estado);
+
+    /** Lista los envíos realizados por un cliente específico */
+    List<Envio> findByClienteId(UUID clienteId);
 }

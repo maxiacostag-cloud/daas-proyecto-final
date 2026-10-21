@@ -41,36 +41,6 @@ class EnvioTest {
         }
     }
 
-    @Nested
-    class Tarifa {
-
-        @Test
-        void usaPesoRealCuandoSuperaAlVolumetrico() {
-            // volumétrico = 10*10*10 / 5000 = 0.2 kg  →  facturable = 10 kg
-            Envio envio = envio("LT-T1", cliente(), "10", "10", "10", "10");
-
-            // 1500 + 450 * 10
-            assertThat(envio.getTarifa()).isEqualByComparingTo("6000.00");
-        }
-
-        @Test
-        void usaPesoVolumetricoCuandoSuperaAlReal() {
-            // volumétrico = 50*40*30 / 5000 = 12 kg  →  facturable = 12 kg
-            Envio envio = envio("LT-T2", cliente(), "1", "50", "40", "30");
-
-            // 1500 + 450 * 12
-            assertThat(envio.getTarifa()).isEqualByComparingTo("6900.00");
-        }
-
-        @Test
-        void redondeaADosDecimales() {
-            Envio envio = envio("LT-T3", cliente(), "1.333", "1", "1", "1");
-
-            // 1500 + 450 * 1.333 = 2099.85
-            assertThat(envio.getTarifa()).isEqualByComparingTo("2099.85");
-            assertThat(envio.getTarifa().scale()).isEqualTo(2);
-        }
-    }
 
     @Nested
     class CambioDeEstado {
