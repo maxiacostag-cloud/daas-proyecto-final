@@ -89,6 +89,10 @@ public class Repartidor extends BaseEntity {
         this.estado = EstadoRepartidor.INACTIVO;
     }
 
+    public void cambiarEstado(EstadoRepartidor nuevoEstado) {
+        this.estado = Objects.requireNonNull(nuevoEstado, "nuevoEstado");
+    }
+
     // =========================================================================
     // GETTERS (LECTORES DE PROPIEDADES)
     // =========================================================================

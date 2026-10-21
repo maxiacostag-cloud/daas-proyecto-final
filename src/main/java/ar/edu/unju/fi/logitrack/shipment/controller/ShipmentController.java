@@ -104,20 +104,6 @@ public class ShipmentController {
     }
 
     /**
-     * PUT /api/v1/envios/{id}/repartidor - Asignar un repartidor a un envío.
-     */
-    @PutMapping("/{id}/repartidor")
-    @Operation(summary = "Asignar un repartidor activo a un envío PENDIENTE")
-    @ApiResponse(responseCode = "200", description = "Repartidor asignado")
-    @ApiResponse(responseCode = "404", description = "No existe el envío o el repartidor")
-    @ApiResponse(responseCode = "422", description = "El repartidor no está ACTIVO o el envío ya no está PENDIENTE")
-    public ResponseEntity<EnvioResponse> asignarRepartidor(
-        @PathVariable UUID id,
-        @Valid @RequestBody AsignarRepartidorRequest request) {
-        return ResponseEntity.ok(shipmentService.asignarRepartidor(id, request));
-    }
-
-    /**
      * GET /api/v1/envios/{id}/historial - Consultar el historial cronológico de cambios de estado.
      */
     @GetMapping("/{id}/historial")

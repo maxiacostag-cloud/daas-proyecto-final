@@ -114,22 +114,6 @@ public class ShipmentServiceImpl implements ShipmentService {
     }
 
     @Override
-    @Transactional
-    public EnvioResponse asignarRepartidor(UUID id, AsignarRepartidorRequest request) {
-        Envio envio = envioRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Envío no encontrado con ID: " + id));
-
-        Repartidor repartidor = repartidorRepository.findById(request.repartidorId())
-            .orElseThrow(() -> new ResourceNotFoundException("Repartidor no encontrado con ID: " + request.repartidorId()));
-
-        // Invocación de asignación encapsulada (comprueba estado ACTIVO y estado PENDIENTE)
-        envio.asignarRepartidor(repartidor);
-        Envio actualizado = envioRepository.save(envio);
-
-        return envioMapper.toResponse(actualizado);
-    }
-
-    @Override
     @Transactional(readOnly = true)
     public List<HistorialEstadoResponse> obtenerHistorial(UUID id) {
         if (!envioRepository.existsById(id)) {

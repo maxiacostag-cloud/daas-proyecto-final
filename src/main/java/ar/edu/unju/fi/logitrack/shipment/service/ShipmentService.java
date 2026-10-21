@@ -13,6 +13,5 @@ public interface ShipmentService {
     List<EnvioResponse> listarPorEstado(EstadoEnvio estado);
     EnvioResponse cambiarEstado(UUID id, CambiarEstadoRequest request);
     EnvioResponse cancelarEnvio(UUID id);
-    EnvioResponse asignarRepartidor(UUID id, AsignarRepartidorRequest request);
     List<HistorialEstadoResponse> obtenerHistorial(UUID id);
 }

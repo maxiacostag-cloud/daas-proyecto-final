@@ -14,6 +14,9 @@ public class RepartidorMapper {
     }
 
     public RepartidorResponse toResponse(Repartidor repartidor) {
+        if (repartidor == null) {
+            return null;
+        }
         return new RepartidorResponse(
                 repartidor.getId(),
                 repartidor.getNombre(),

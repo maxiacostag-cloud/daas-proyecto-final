@@ -22,4 +22,6 @@ public interface EnvioRepository extends JpaRepository<Envio, UUID> {
 
     /** Lista los envíos realizados por un cliente específico */
     List<Envio> findByClienteId(UUID clienteId);
+
+    boolean existsByRepartidorIdAndEstado(UUID repartidorId, EstadoEnvio estado);
 }

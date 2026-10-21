@@ -165,9 +165,12 @@ el resultado se ve en la pestaña **Actions** del repositorio.
 |---|---|---|
 | `EstadoEnvioTest` | Unitario | Matriz completa de transiciones de la máquina de estados |
 | `EnvioTest` | Unitario | Cálculo de tarifa, cancelación, asignación, historial |
-| `RepartidorServiceTest` | Unitario (Mockito) | Servicio con repositorio mockeado — **modelo para `ShipmentServiceTest`** |
-| `RepartidorRepositoryTest` / `EnvioRepositoryTest` | Integración (`@DataJpaTest`) | Mapeo JPA, UUID, auditoría, cascada del historial |
-| `RepartidorControllerTest` | Integración (`@WebMvcTest`) | Contrato HTTP, códigos 201/400/404 |
+| `RepartidorServiceTest` | Unitario (Mockito) | Registro, listados, cambio de estado (activar/desactivar) y regla de envíos en ruta |
+| `AsignacionServiceTest` | Unitario (Mockito) | Asignación, reasignación, validaciones de repartidor inactivo y estados de envío |
+| `RepartidorRepositoryTest` / `EnvioRepositoryTest` | Integración (`@DataJpaTest`) | Mapeo JPA, UUID, auditoría, verificación de envíos en ruta |
+| `RepartidorControllerTest` | Integración (`@WebMvcTest`) | Contrato HTTP de repartidores (POST, GET, PATCH de estado), códigos 200/201/400/404/422 |
+| `AsignacionControllerTest` | Integración (`@WebMvcTest`) | Contrato HTTP de asignación (PUT), códigos 200/400/404/422 |
+| `GestionRepartidoresIntegrationTest` | Integración (`@SpringBootTest`) | Flujo completo e2e: registrar → listar → asignar a envío → reglas de negocio en H2 |
 | `ShipmentServiceApplicationTests` | `@SpringBootTest` | El contexto completo levanta |
 
 ## 5. Estructura
@@ -216,16 +219,31 @@ Base: `/api/v1`. Errores en formato `application/problem+json`:
 | Método | Endpoint | Descripción | Estado |
 |---|---|---|---|
 | POST | `/repartidores` | Registrar repartidor | ✅ |
-| GET | `/repartidores?estado=ACTIVO` | Listar (filtro opcional) | ✅ |
-| GET | `/repartidores/{id}` | Detalle | ✅ |
+| GET | `/repartidores?estado=ACTIVO` | Listar repartidores (todos o activos) | ✅ |
+| GET | `/repartidores/{id}` | Detalle de un repartidor | ✅ |
+| PATCH | `/repartidores/{id}/estado` | Activar o desactivar repartidor | ✅ (Issue 3) |
+| PUT | `/envios/{id}/repartidor` | Asignar repartidor `{ "repartidorId": "..." }` | ✅ (Issue 3) |
 | POST | `/envios` | Registrar envío (cliente, origen, destino, peso, medidas) | ⬜ |
 | GET | `/envios/{id}` | Consultar por id | ⬜ |
 | GET | `/envios/seguimiento/{codigo}` | Consultar por código de seguimiento | ⬜ |
 | GET | `/envios?estado=PENDIENTE` | Listar por estado | ⬜ |
 | PATCH | `/envios/{id}/estado` | Cambiar estado `{ "estado": "EN_RUTA" }` | ⬜ |
 | POST | `/envios/{id}/cancelacion` | Cancelar (solo PENDIENTE) | ⬜ |
-| PUT | `/envios/{id}/repartidor` | Asignar repartidor `{ "repartidorId": "..." }` | ⬜ |
 | GET | `/envios/{id}/historial` | Historial de estados | ⬜ |
+
+### Demo de Endpoints (Issue 3)
+
+El archivo [`http/repartidores.http`](http/repartidores.http) contiene todos los requests listos para ejecutar desde IntelliJ IDEA o VS Code (con la extensión REST Client):
+
+1. **Registrar repartidor:** `POST /api/v1/repartidores`
+2. **Listar disponibles:** `GET /api/v1/repartidores?estado=ACTIVO`
+3. **Detalle de repartidor:** `GET /api/v1/repartidores/{id}`
+4. **Asignación exitosa:** `PUT /api/v1/envios/{envioId}/repartidor` con repartidor activo y envío en `PENDIENTE` (200 OK).
+5. **Reasignación:** `PUT /api/v1/envios/{envioId}/repartidor` sobre un envío que ya tiene repartidor pero continúa `PENDIENTE` (200 OK).
+6. **Rechazo por inactivo:** Asignar repartidor en estado `INACTIVO` (422 Unprocessable Entity).
+7. **Rechazo por estado de envío:** Asignar a un envío en `EN_RUTA` o `CANCELADO` (422 Unprocessable Entity).
+8. **Cambio de estado:** `PATCH /api/v1/repartidores/{id}/estado` a `INACTIVO` (200 OK si no tiene envíos en ruta).
+9. **Protección de repartidor:** `PATCH /api/v1/repartidores/{id}/estado` a `INACTIVO` sobre un repartidor con envíos en `EN_RUTA` (422 Unprocessable Entity).
 
 ## 8. Flujo de trabajo en Git
 
