@@ -1,0 +1,138 @@
+### =====================================================================
+### Requests de demo - Issue 3: Repartidores y Asignación de Envíos
+### Compatible con IntelliJ HTTP Client y VS Code REST Client.
+### Los UUIDs corresponden a los datos cargados en db/init/01-schema.sql
+### =====================================================================
+
+@host = http://localhost:8080
+
+### ---------------------------------------------------------------------
+### 1. REPARTIDORES: REGISTRO Y CONSULTAS
+### ---------------------------------------------------------------------
+
+### 1.1. Registrar un nuevo repartidor (nace ACTIVO) -> 201 Created
+POST {{host}}/api/v1/repartidores
+Content-Type: application/json
+
+{
+  "nombre": "Pedro Ramírez",
+  "tipoVehiculo": "MOTO"
+}
+
+### 1.2. Registrar con datos inválidos (nombre vacío) -> 400 Bad Request
+POST {{host}}/api/v1/repartidores
+Content-Type: application/json
+
+{
+  "nombre": "",
+  "tipoVehiculo": "MOTO"
+}
+
+### 1.3. Registrar con tipo de vehículo inexistente -> 400 Bad Request
+POST {{host}}/api/v1/repartidores
+Content-Type: application/json
+
+{
+  "nombre": "Carlos Díaz",
+  "tipoVehiculo": "AVION"
+}
+
+### 1.4. Listar todos los repartidores -> 200 OK
+GET {{host}}/api/v1/repartidores
+
+### 1.5. Listar solo los disponibles (filtro ?estado=ACTIVO) -> 200 OK
+GET {{host}}/api/v1/repartidores?estado=ACTIVO
+
+### 1.6. Detalle de un repartidor existente (Lucía Fernández) -> 200 OK
+GET {{host}}/api/v1/repartidores/3f6c1a52-8e0b-4d7a-9c11-0a1b2c3d4e01
+
+### 1.7. Detalle de un repartidor inexistente -> 404 Not Found
+GET {{host}}/api/v1/repartidores/00000000-0000-0000-0000-000000000000
+
+### ---------------------------------------------------------------------
+### 2. REPARTIDORES: CAMBIO DE ESTADO (ACTIVAR / DESACTIVAR)
+### ---------------------------------------------------------------------
+
+### 2.1. Desactivar un repartidor libre sin envíos en ruta (Martín Quispe) -> 200 OK
+PATCH {{host}}/api/v1/repartidores/3f6c1a52-8e0b-4d7a-9c11-0a1b2c3d4e02/estado
+Content-Type: application/json
+
+{
+  "estado": "INACTIVO"
+}
+
+### 2.2. Intentar desactivar un repartidor con envíos EN_RUTA (Lucía Fernández) -> 422 Unprocessable Entity
+PATCH {{host}}/api/v1/repartidores/3f6c1a52-8e0b-4d7a-9c11-0a1b2c3d4e01/estado
+Content-Type: application/json
+
+{
+  "estado": "INACTIVO"
+}
+
+### 2.3. Reactivar el repartidor (Martín Quispe pasa a ACTIVO) -> 200 OK
+PATCH {{host}}/api/v1/repartidores/3f6c1a52-8e0b-4d7a-9c11-0a1b2c3d4e02/estado
+Content-Type: application/json
+
+{
+  "estado": "ACTIVO"
+}
+
+### ---------------------------------------------------------------------
+### 3. ASIGNACIÓN DE REPARTIDORES A ENVÍOS
+### ---------------------------------------------------------------------
+
+### 3.1. Asignar un repartidor ACTIVO a un envío PENDIENTE -> 200 OK
+PUT {{host}}/api/v1/envios/eeeeeeee-0000-4000-8000-000000000001/repartidor
+Content-Type: application/json
+
+{
+  "repartidorId": "3f6c1a52-8e0b-4d7a-9c11-0a1b2c3d4e01"
+}
+
+### 3.2. Reasignar el envío PENDIENTE a otro repartidor ACTIVO -> 200 OK
+PUT {{host}}/api/v1/envios/eeeeeeee-0000-4000-8000-000000000001/repartidor
+Content-Type: application/json
+
+{
+  "repartidorId": "3f6c1a52-8e0b-4d7a-9c11-0a1b2c3d4e02"
+}
+
+### 3.3. Intentar asignar un repartidor INACTIVO (Sofía Mamaní) -> 422 Unprocessable Entity
+PUT {{host}}/api/v1/envios/eeeeeeee-0000-4000-8000-000000000002/repartidor
+Content-Type: application/json
+
+{
+  "repartidorId": "3f6c1a52-8e0b-4d7a-9c11-0a1b2c3d4e03"
+}
+
+### 3.4. Intentar asignar a un envío que ya está EN_RUTA -> 422 Unprocessable Entity
+PUT {{host}}/api/v1/envios/eeeeeeee-0000-4000-8000-000000000003/repartidor
+Content-Type: application/json
+
+{
+  "repartidorId": "3f6c1a52-8e0b-4d7a-9c11-0a1b2c3d4e02"
+}
+
+### 3.5. Intentar asignar a un envío CANCELADO -> 422 Unprocessable Entity
+PUT {{host}}/api/v1/envios/eeeeeeee-0000-4000-8000-000000000005/repartidor
+Content-Type: application/json
+
+{
+  "repartidorId": "3f6c1a52-8e0b-4d7a-9c11-0a1b2c3d4e01"
+}
+
+### 3.6. Asignar a un envío inexistente -> 404 Not Found
+PUT {{host}}/api/v1/envios/00000000-0000-0000-0000-000000000000/repartidor
+Content-Type: application/json
+
+{
+  "repartidorId": "3f6c1a52-8e0b-4d7a-9c11-0a1b2c3d4e01"
+}
+
+### 3.7. Asignar un repartidor inexistente -> 404 Not Found
+PUT {{host}}/api/v1/envios/eeeeeeee-0000-4000-8000-000000000001/repartidor
+Content-Type: application/json
+
+{
+  "repartidorId": "00000000-0000-0000-0000-000000000000"
+}

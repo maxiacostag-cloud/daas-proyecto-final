@@ -1,12 +1,15 @@
 package ar.edu.unju.fi.logitrack.shipment.controller;
 
+import ar.edu.unju.fi.logitrack.shipment.dto.repartidor.CambioEstadoRepartidorRequest;
 import ar.edu.unju.fi.logitrack.shipment.dto.repartidor.RepartidorRequest;
 import ar.edu.unju.fi.logitrack.shipment.dto.repartidor.RepartidorResponse;
 import ar.edu.unju.fi.logitrack.shipment.entity.enums.EstadoRepartidor;
 import ar.edu.unju.fi.logitrack.shipment.entity.enums.TipoVehiculo;
+import ar.edu.unju.fi.logitrack.shipment.exception.BusinessRuleException;
 import ar.edu.unju.fi.logitrack.shipment.exception.ResourceNotFoundException;
 import ar.edu.unju.fi.logitrack.shipment.service.RepartidorService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -23,6 +26,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -101,6 +105,58 @@ class RepartidorControllerTest {
     void obtener_conIdQueNoEsUuid_devuelve400() throws Exception {
         mockMvc.perform(get(URL + "/no-es-un-uuid"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("PATCH /api/v1/repartidores/{id}/estado: 200 con el repartidor actualizado")
+    void cambiarEstado_devuelve200() throws Exception {
+        UUID id = UUID.randomUUID();
+        given(repartidorService.cambiarEstado(id, EstadoRepartidor.INACTIVO))
+                .willReturn(respuesta(id, EstadoRepartidor.INACTIVO));
+
+        mockMvc.perform(patch(URL + "/{id}/estado", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CambioEstadoRepartidorRequest(EstadoRepartidor.INACTIVO))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id.toString()))
+                .andExpect(jsonPath("$.estado").value("INACTIVO"));
+    }
+
+    @Test
+    @DisplayName("PATCH: 400 si falta el estado en el body")
+    void cambiarEstado_sinEstado_devuelve400() throws Exception {
+        UUID id = UUID.randomUUID();
+        mockMvc.perform(patch(URL + "/{id}/estado", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("PATCH: 404 si el repartidor no existe")
+    void cambiarEstado_inexistente_devuelve404() throws Exception {
+        UUID id = UUID.randomUUID();
+        given(repartidorService.cambiarEstado(id, EstadoRepartidor.INACTIVO))
+                .willThrow(ResourceNotFoundException.of("Repartidor", id));
+
+        mockMvc.perform(patch(URL + "/{id}/estado", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CambioEstadoRepartidorRequest(EstadoRepartidor.INACTIVO))))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("PATCH: 422 si el repartidor tiene envíos EN_RUTA")
+    void cambiarEstado_conEnviosEnRuta_devuelve422() throws Exception {
+        UUID id = UUID.randomUUID();
+        given(repartidorService.cambiarEstado(id, EstadoRepartidor.INACTIVO))
+                .willThrow(new BusinessRuleException("No se puede desactivar al repartidor: tiene envíos EN_RUTA"));
+
+        mockMvc.perform(patch(URL + "/{id}/estado", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CambioEstadoRepartidorRequest(EstadoRepartidor.INACTIVO))))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.status").value(422));
     }
 
     private static RepartidorResponse respuesta(UUID id, EstadoRepartidor estado) {

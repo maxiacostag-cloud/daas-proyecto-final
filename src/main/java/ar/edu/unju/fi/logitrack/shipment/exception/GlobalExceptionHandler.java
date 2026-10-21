@@ -3,6 +3,7 @@ package ar.edu.unju.fi.logitrack.shipment.exception;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -50,6 +51,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         log.warn("Violación de integridad de datos", ex);
         return build(HttpStatus.CONFLICT, "Conflicto de datos",
                 "La operación viola una restricción de la base de datos (posible dato duplicado).");
+    }
+
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ProblemDetail> handleOptimisticLocking(ObjectOptimisticLockingFailureException ex) {
+        log.warn("Conflicto de concurrencia optimista", ex);
+        return build(HttpStatus.CONFLICT, "Conflicto de concurrencia",
+                "El recurso fue modificado concurrentemente por otra operación. Intente nuevamente.");
     }
 
     @ExceptionHandler(Exception.class)

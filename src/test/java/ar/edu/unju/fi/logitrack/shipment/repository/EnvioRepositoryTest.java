@@ -14,6 +14,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
 
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -78,5 +79,19 @@ class EnvioRepositoryTest {
         assertThat(envioRepository.findByEstadoOrderByCreatedAtDesc(EstadoEnvio.CANCELADO))
                 .extracting(Envio::getCodigoSeguimiento)
                 .containsExactly("LT-REPO000004");
+    }
+
+    @Test
+    void existsByRepartidorIdAndEstado_devuelveTrueSoloSiCoincideRepartidorYEstado() {
+        Cliente cliente = entityManager.persist(TestDataFactory.cliente());
+        Repartidor repartidor = entityManager.persist(TestDataFactory.repartidorActivo());
+        Envio envio = TestDataFactory.envioPendiente("LT-REPO000005", cliente);
+        envio.asignarRepartidor(repartidor);
+        envio.cambiarEstado(EstadoEnvio.EN_RUTA);
+        envioRepository.saveAndFlush(envio);
+
+        assertThat(envioRepository.existsByRepartidorIdAndEstado(repartidor.getId(), EstadoEnvio.EN_RUTA)).isTrue();
+        assertThat(envioRepository.existsByRepartidorIdAndEstado(repartidor.getId(), EstadoEnvio.PENDIENTE)).isFalse();
+        assertThat(envioRepository.existsByRepartidorIdAndEstado(UUID.randomUUID(), EstadoEnvio.EN_RUTA)).isFalse();
     }
 }

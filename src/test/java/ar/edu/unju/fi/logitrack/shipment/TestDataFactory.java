@@ -4,6 +4,8 @@ import ar.edu.unju.fi.logitrack.shipment.entity.Cliente;
 import ar.edu.unju.fi.logitrack.shipment.entity.Direccion;
 import ar.edu.unju.fi.logitrack.shipment.entity.Envio;
 import ar.edu.unju.fi.logitrack.shipment.entity.Repartidor;
+import ar.edu.unju.fi.logitrack.shipment.entity.enums.EstadoEnvio;
+import ar.edu.unju.fi.logitrack.shipment.entity.enums.EstadoRepartidor;
 import ar.edu.unju.fi.logitrack.shipment.entity.enums.TipoVehiculo;
 
 import java.math.BigDecimal;
@@ -15,7 +17,11 @@ public final class TestDataFactory {
     }
 
     public static Cliente cliente() {
-        return new Cliente("Tienda Norte SRL", "ventas@tiendanorte.com", "+54 388 400-1000");
+        return cliente("ventas@tiendanorte.com");
+    }
+
+    public static Cliente cliente(String email) {
+        return new Cliente("Tienda Norte SRL", email, "+54 388 400-1000");
     }
 
     public static Direccion origen() {
@@ -26,14 +32,20 @@ public final class TestDataFactory {
         return new Direccion("Av. Fascio", "1200", "San Salvador de Jujuy", "4600");
     }
 
+    public static Repartidor repartidor(String nombre, TipoVehiculo tipoVehiculo, EstadoRepartidor estado) {
+        Repartidor repartidor = new Repartidor(nombre, tipoVehiculo);
+        if (estado == EstadoRepartidor.INACTIVO) {
+            repartidor.desactivar();
+        }
+        return repartidor;
+    }
+
     public static Repartidor repartidorActivo() {
-        return new Repartidor("Lucía Fernández", TipoVehiculo.MOTO);
+        return repartidor("Lucía Fernández", TipoVehiculo.MOTO, EstadoRepartidor.ACTIVO);
     }
 
     public static Repartidor repartidorInactivo() {
-        Repartidor repartidor = new Repartidor("Sofía Mamaní", TipoVehiculo.BICICLETA);
-        repartidor.desactivar();
-        return repartidor;
+        return repartidor("Sofía Mamaní", TipoVehiculo.BICICLETA, EstadoRepartidor.INACTIVO);
     }
 
     public static Envio envioPendiente(String codigo, Cliente cliente) {

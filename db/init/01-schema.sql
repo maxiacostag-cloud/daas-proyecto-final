@@ -100,3 +100,42 @@ INSERT INTO repartidores (id, nombre, tipo_vehiculo, estado, version, created_at
 
 INSERT INTO clientes (id, nombre, email, telefono, version, created_at, updated_at) VALUES
     ('7a2d9b10-1c3e-4f5a-8b6c-0d1e2f3a4b01', 'Tienda Norte SRL', 'ventas@tiendanorte.com', '+54 388 400-1000', 0, NOW(6), NOW(6));
+
+-- ---------------------------------------------------------------------
+-- Envíos de prueba para demo (Issue 3)
+-- 0001: PENDIENTE sin repartidor (para probar asignación exitosa)
+-- 0002: PENDIENTE sin repartidor (para probar rechazo de repartidor inactivo)
+-- 0003: EN_RUTA con Lucía Fernández (rechaza asignación; Lucía no se puede desactivar)
+-- 0004: ENTREGADO (rechaza asignación)
+-- 0005: CANCELADO (rechaza asignación)
+-- ---------------------------------------------------------------------
+INSERT INTO envios (id, codigo_seguimiento, cliente_id, repartidor_id,
+    origen_calle, origen_numero, origen_ciudad, origen_codigo_postal,
+    destino_calle, destino_numero, destino_ciudad, destino_codigo_postal,
+    peso_kg, alto_cm, ancho_cm, largo_cm, tarifa, estado, version, created_at, updated_at) VALUES
+    ('eeeeeeee-0000-4000-8000-000000000001', 'LT-2026-000001', '7a2d9b10-1c3e-4f5a-8b6c-0d1e2f3a4b01', NULL,
+     'Belgrano', '120', 'San Salvador de Jujuy', '4600', 'Lavalle', '450', 'San Salvador de Jujuy', '4600',
+     2.500, 20.00, 30.00, 40.00, 3500.00, 'PENDIENTE', 0, NOW(6), NOW(6)),
+    ('eeeeeeee-0000-4000-8000-000000000002', 'LT-2026-000002', '7a2d9b10-1c3e-4f5a-8b6c-0d1e2f3a4b01', NULL,
+     'Alvear', '800', 'San Salvador de Jujuy', '4600', 'Güemes', '75', 'Palpalá', '4612',
+     8.000, 40.00, 50.00, 60.00, 6200.00, 'PENDIENTE', 0, NOW(6), NOW(6)),
+    ('eeeeeeee-0000-4000-8000-000000000003', 'LT-2026-000003', '7a2d9b10-1c3e-4f5a-8b6c-0d1e2f3a4b01', '3f6c1a52-8e0b-4d7a-9c11-0a1b2c3d4e01',
+     'Belgrano', '120', 'San Salvador de Jujuy', '4600', 'Sarmiento', '300', 'San Salvador de Jujuy', '4600',
+     1.200, 10.00, 20.00, 25.00, 2800.00, 'EN_RUTA', 0, NOW(6), NOW(6)),
+    ('eeeeeeee-0000-4000-8000-000000000004', 'LT-2026-000004', '7a2d9b10-1c3e-4f5a-8b6c-0d1e2f3a4b01', '3f6c1a52-8e0b-4d7a-9c11-0a1b2c3d4e02',
+     'Alvear', '800', 'San Salvador de Jujuy', '4600', 'Necochea', '210', 'San Salvador de Jujuy', '4600',
+     0.500, 5.00, 15.00, 20.00, 2000.00, 'ENTREGADO', 0, NOW(6), NOW(6)),
+    ('eeeeeeee-0000-4000-8000-000000000005', 'LT-2026-000005', '7a2d9b10-1c3e-4f5a-8b6c-0d1e2f3a4b01', NULL,
+     'Belgrano', '120', 'San Salvador de Jujuy', '4600', 'Balcarce', '90', 'Yala', '4600',
+     4.000, 25.00, 35.00, 45.00, 4100.00, 'CANCELADO', 0, NOW(6), NOW(6));
+
+INSERT INTO historial_estados (id, envio_id, estado_anterior, estado_nuevo, fecha_hora, version, created_at, updated_at) VALUES
+    ('ffffffff-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000001', NULL, 'PENDIENTE', NOW(6), 0, NOW(6), NOW(6)),
+    ('ffffffff-0000-4000-8000-000000000002', 'eeeeeeee-0000-4000-8000-000000000002', NULL, 'PENDIENTE', NOW(6), 0, NOW(6), NOW(6)),
+    ('ffffffff-0000-4000-8000-000000000003', 'eeeeeeee-0000-4000-8000-000000000003', NULL, 'PENDIENTE', NOW(6), 0, NOW(6), NOW(6)),
+    ('ffffffff-0000-4000-8000-000000000004', 'eeeeeeee-0000-4000-8000-000000000003', 'PENDIENTE', 'EN_RUTA', NOW(6), 0, NOW(6), NOW(6)),
+    ('ffffffff-0000-4000-8000-000000000005', 'eeeeeeee-0000-4000-8000-000000000004', NULL, 'PENDIENTE', NOW(6), 0, NOW(6), NOW(6)),
+    ('ffffffff-0000-4000-8000-000000000006', 'eeeeeeee-0000-4000-8000-000000000004', 'PENDIENTE', 'EN_RUTA', NOW(6), 0, NOW(6), NOW(6)),
+    ('ffffffff-0000-4000-8000-000000000007', 'eeeeeeee-0000-4000-8000-000000000004', 'EN_RUTA', 'ENTREGADO', NOW(6), 0, NOW(6), NOW(6)),
+    ('ffffffff-0000-4000-8000-000000000008', 'eeeeeeee-0000-4000-8000-000000000005', NULL, 'PENDIENTE', NOW(6), 0, NOW(6), NOW(6)),
+    ('ffffffff-0000-4000-8000-000000000009', 'eeeeeeee-0000-4000-8000-000000000005', 'PENDIENTE', 'CANCELADO', NOW(6), 0, NOW(6), NOW(6));
