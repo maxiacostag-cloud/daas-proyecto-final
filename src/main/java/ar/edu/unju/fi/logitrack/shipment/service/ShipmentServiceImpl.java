@@ -66,7 +66,7 @@ public class ShipmentServiceImpl implements ShipmentService {
     public EnvioResponse obtenerPorId(UUID id) {
         Envio envio = envioRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Envío no encontrado con ID: " + id));
-        return envioMapper.toResponse(envio);
+         return envioMapper.toResponse(envio);
     }
 
     @Override
