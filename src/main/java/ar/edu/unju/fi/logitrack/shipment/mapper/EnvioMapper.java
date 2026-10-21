@@ -25,7 +25,8 @@ public class EnvioMapper {
             envio.getCliente() != null ? envio.getCliente().getId() : null,
             envio.getRepartidor() != null ? envio.getRepartidor().getId() : null,
             envio.getOrigen() != null ? envio.getOrigen().getCiudad() : null,
-            envio.getDestino() != null ? envio.getDestino().getCiudad() : null
+            envio.getDestino() != null ? envio.getDestino().getCiudad() : null,
+            envio.getTarifa()
         );
     }
 

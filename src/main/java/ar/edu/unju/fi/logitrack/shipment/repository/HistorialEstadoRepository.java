@@ -1,6 +1,5 @@
 package ar.edu.unju.fi.logitrack.shipment.repository;
 
-import ar.edu.unju.fi.logitrack.shipment.entity.AuditoriaEnvio;
 import ar.edu.unju.fi.logitrack.shipment.entity.HistorialEstado;
 import org.springframework.data.jpa.repository.JpaRepository;
 

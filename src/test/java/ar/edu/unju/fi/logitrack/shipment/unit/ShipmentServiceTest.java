@@ -1,6 +1,7 @@
 package ar.edu.unju.fi.logitrack.shipment.unit;
 
 import ar.edu.unju.fi.logitrack.shipment.dto.envio.CambiarEstadoRequest;
+import ar.edu.unju.fi.logitrack.shipment.dto.envio.DatosClienteRequest;
 import ar.edu.unju.fi.logitrack.shipment.dto.envio.EnvioResponse;
 import ar.edu.unju.fi.logitrack.shipment.dto.envio.HistorialEstadoResponse;
 import ar.edu.unju.fi.logitrack.shipment.dto.envio.RegistrarEnvioRequest;
@@ -13,6 +14,7 @@ import ar.edu.unju.fi.logitrack.shipment.exception.ResourceNotFoundException;
 import ar.edu.unju.fi.logitrack.shipment.mapper.EnvioMapper;
 import ar.edu.unju.fi.logitrack.shipment.repository.*;
 import ar.edu.unju.fi.logitrack.shipment.service.ShipmentServiceImpl;
+import ar.edu.unju.fi.logitrack.shipment.service.TrackingCodeGenerator;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -21,6 +23,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
@@ -32,6 +35,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 /**
@@ -62,6 +66,13 @@ class ShipmentServiceTest {
 
     @Mock
     private EnvioMapper envioMapper;
+
+    /**
+     * Generador de códigos de seguimiento real. Se usa como espía para que arme códigos de verdad
+     * y a la vez poder revisar cuántas veces lo llamó el servicio.
+     */
+    @Spy
+    private TrackingCodeGenerator trackingCodeGenerator = new TrackingCodeGenerator();
 
     // =========================================================================
     // INYECCIÓN DEL SERVICIO BAJO PRUEBA
@@ -127,7 +138,7 @@ class ShipmentServiceTest {
         when(clienteRepository.findById(clienteId)).thenReturn(Optional.of(clienteEjemplo));
         when(envioRepository.save(any(Envio.class))).thenReturn(envioEjemplo);
         when(envioMapper.toResponse(any(Envio.class))).thenReturn(new EnvioResponse(
-            UUID.randomUUID(), "TRK-12345678", 2.5, EstadoEnvio.PENDIENTE, clienteId, null, "Jujuy", "Jujuy"
+            UUID.randomUUID(), "TRK-12345678", 2.5, EstadoEnvio.PENDIENTE, clienteId, null, "Jujuy", "Jujuy", new BigDecimal("2625.00")
         ));
 
         // WHEN (Cuando): Ejecución del método bajo prueba
@@ -460,5 +471,99 @@ class ShipmentServiceTest {
         assertThrows(ResourceNotFoundException.class, () -> shipmentService.obtenerHistorial(envioId));
 
         verify(historialEstadoRepository, never()).findByEnvioIdOrderByFechaHoraDesc(any(UUID.class));
+    }
+
+    /**
+     * Arma un pedido de registro que no trae el clienteId, sino los datos del cliente.
+     *
+     * @param datos datos del cliente que se mandan en el pedido
+     * @return el pedido listo para mandarle al servicio
+     */
+    private RegistrarEnvioRequest armarPedidoConDatosDeCliente(DatosClienteRequest datos) {
+        return new RegistrarEnvioRequest(
+            null, "Calle 1", "123", "Jujuy", "4600",
+            "Calle 2", "456", "Jujuy", "4600",
+            2.5, 10.0, 10.0, 10.0,
+            datos
+        );
+    }
+
+    /**
+     * Si se mandan los datos de un cliente que no existe, el servicio lo registra
+     * y el envío queda a nombre de ese cliente nuevo.
+     */
+    @Test
+    @DisplayName("Cliente: con los datos de un cliente nuevo se registra el cliente y el envío")
+    void testRegistrarEnvioConClienteNuevo() {
+        DatosClienteRequest datos = new DatosClienteRequest("Ana Torres", "ana@gmail.com", "3884000000");
+        when(clienteRepository.findByEmailIgnoreCase("ana@gmail.com")).thenReturn(Optional.empty());
+        when(clienteRepository.save(any(Cliente.class))).thenAnswer(invocacion -> invocacion.getArgument(0));
+        when(envioRepository.save(any(Envio.class))).thenAnswer(invocacion -> invocacion.getArgument(0));
+
+        shipmentService.registrarEnvio(armarPedidoConDatosDeCliente(datos));
+
+        ArgumentCaptor<Envio> envioGuardado = ArgumentCaptor.forClass(Envio.class);
+        verify(envioRepository).save(envioGuardado.capture());
+        assertEquals("ana@gmail.com", envioGuardado.getValue().getCliente().getEmail());
+        verify(clienteRepository, times(1)).save(any(Cliente.class));
+    }
+
+    /**
+     * Si se mandan los datos de un cliente que ya estaba registrado (mismo email),
+     * se usa ese cliente y no se crea otro.
+     */
+    @Test
+    @DisplayName("Cliente: si el email ya existe se usa ese cliente y no se duplica")
+    void testRegistrarEnvioReutilizaClienteExistente() {
+        DatosClienteRequest datos = new DatosClienteRequest("Juan Perez", "juan@gmail.com", "3881234567");
+        when(clienteRepository.findByEmailIgnoreCase("juan@gmail.com")).thenReturn(Optional.of(clienteEjemplo));
+        when(envioRepository.save(any(Envio.class))).thenAnswer(invocacion -> invocacion.getArgument(0));
+
+        shipmentService.registrarEnvio(armarPedidoConDatosDeCliente(datos));
+
+        ArgumentCaptor<Envio> envioGuardado = ArgumentCaptor.forClass(Envio.class);
+        verify(envioRepository).save(envioGuardado.capture());
+        assertSame(clienteEjemplo, envioGuardado.getValue().getCliente());
+        verify(clienteRepository, never()).save(any(Cliente.class));
+    }
+
+    /**
+     * Si el pedido no trae ni el clienteId ni los datos del cliente, no se puede saber
+     * de quién es el envío, así que no se registra.
+     */
+    @Test
+    @DisplayName("Cliente: sin clienteId ni datos del cliente no se registra el envío")
+    void testRegistrarEnvioSinClienteLanzaExcepcion() {
+        RegistrarEnvioRequest pedido = armarPedidoConDatosDeCliente(null);
+
+        assertThrows(BusinessRuleException.class, () -> shipmentService.registrarEnvio(pedido));
+
+        verify(envioRepository, never()).save(any(Envio.class));
+    }
+
+    /**
+     * El código de seguimiento lo arma el {@link TrackingCodeGenerator} y empieza con "LT-".
+     */
+    @Test
+    @DisplayName("Código: el envío registrado recibe un código de seguimiento que empieza con LT-")
+    void testCodigoDeSeguimientoUsaElGenerador() {
+        Envio envio = registrarYObtenerEnvioGuardado(2.5, 10.0, 10.0, 10.0);
+
+        assertTrue(envio.getCodigoSeguimiento().startsWith("LT-"));
+        verify(trackingCodeGenerator, times(1)).generar();
+    }
+
+    /**
+     * Si el primer código que sale ya lo tiene otro envío, el servicio pide otro
+     * hasta encontrar uno libre.
+     */
+    @Test
+    @DisplayName("Código: si el código ya existe se genera otro")
+    void testCodigoDeSeguimientoNoSeRepite() {
+        when(envioRepository.existsByCodigoSeguimiento(anyString())).thenReturn(true, false);
+
+        registrarYObtenerEnvioGuardado(2.5, 10.0, 10.0, 10.0);
+
+        verify(trackingCodeGenerator, times(2)).generar();
     }
 }
