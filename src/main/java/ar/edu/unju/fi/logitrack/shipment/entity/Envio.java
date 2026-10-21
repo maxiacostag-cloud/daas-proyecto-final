@@ -6,6 +6,7 @@ import ar.edu.unju.fi.logitrack.shipment.exception.InvalidStateTransitionExcepti
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -15,6 +16,24 @@ import java.util.Objects;
 @Entity
 @Table(name = "envios")
 public class Envio extends BaseEntity {
+
+    /**
+     * Monto fijo que se cobra por cualquier envío, sin importar el paquete.
+     * TODO: confirmar con el profe o con el equipo si este valor está bien o hay que cambiarlo.
+     */
+    static final BigDecimal TARIFA_BASE = new BigDecimal("1500.00");
+
+    /**
+     * Precio que se suma por cada kilo que se cobra.
+     * TODO: confirmar con el profe o con el equipo si este valor está bien o hay que cambiarlo.
+     */
+    static final BigDecimal PRECIO_POR_KG = new BigDecimal("450.00");
+
+    /**
+     * Número por el que se divide el volumen del paquete (en cm³) para sacar su peso volumétrico.
+     * Es el valor que usan normalmente las empresas de envíos.
+     */
+    static final BigDecimal DIVISOR_VOLUMETRICO = new BigDecimal("5000");
 
     @Column(name = "codigo_seguimiento", nullable = false, unique = true, length = 20, updatable = false)
     private String codigoSeguimiento;
@@ -57,6 +76,13 @@ public class Envio extends BaseEntity {
     @Column(name = "largo_cm", nullable = false, precision = 10, scale = 2)
     private BigDecimal largoCm;
 
+    /**
+     * Precio final del envío. Se calcula una sola vez cuando se crea el envío.
+     * Usamos BigDecimal y no Double para que no haya errores de redondeo con la plata.
+     */
+    @Column(nullable = false, precision = 12, scale = 2)
+    private BigDecimal tarifa;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private EstadoEnvio estado;
@@ -78,8 +104,28 @@ public class Envio extends BaseEntity {
         this.altoCm = requerirPositivo(altoCm, "alto");
         this.anchoCm = requerirPositivo(anchoCm, "ancho");
         this.largoCm = requerirPositivo(largoCm, "largo");
+        this.tarifa = calcularTarifa();
         this.estado = EstadoEnvio.PENDIENTE;
         registrarHistorial(null, EstadoEnvio.PENDIENTE);
+    }
+
+    /**
+     * Calcula cuánto cuesta el envío.
+     * <p>
+     * Primero se saca el peso volumétrico del paquete (alto x ancho x largo / 5000).
+     * Después se toma el mayor entre ese peso y el peso real, así un paquete grande pero liviano
+     * no sale más barato de lo que debería. Por último se aplica la fórmula:
+     * tarifa base + precio por kilo x peso que se cobra, redondeado a 2 decimales.
+     * </p>
+     *
+     * @return el precio del envío con 2 decimales
+     */
+    public BigDecimal calcularTarifa() {
+        BigDecimal pesoVolumetrico = altoCm.multiply(anchoCm).multiply(largoCm)
+            .divide(DIVISOR_VOLUMETRICO, 3, RoundingMode.HALF_UP);
+        BigDecimal pesoQueSeCobra = pesoKg.max(pesoVolumetrico);
+        return TARIFA_BASE.add(PRECIO_POR_KG.multiply(pesoQueSeCobra))
+            .setScale(2, RoundingMode.HALF_UP);
     }
 
     public boolean puedeCancelarse() {
@@ -137,6 +183,7 @@ public class Envio extends BaseEntity {
     public Direccion getOrigen() { return origen; }
     public Direccion getDestino() { return destino; }
     public BigDecimal getPesoKg() { return pesoKg; }
+    public BigDecimal getTarifa() { return tarifa; }
     public EstadoEnvio getEstado() { return estado; }
     public List<HistorialEstado> getHistorial() { return Collections.unmodifiableList(historial); }
 }
