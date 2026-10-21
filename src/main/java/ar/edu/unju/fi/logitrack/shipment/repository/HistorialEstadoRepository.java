@@ -9,5 +9,6 @@ import java.util.UUID;
 /** Solo lectura en la práctica: los registros se crean por cascada desde {@code Envio}. */
 public interface HistorialEstadoRepository extends JpaRepository<HistorialEstado, UUID> {
 
-    List<HistorialEstado> findByEnvioIdOrderByFechaHoraAsc(UUID envioId);
+    List<HistorialEstado> findByEnvioIdOrderByFechaHoraDesc(UUID envioId);
+
 }

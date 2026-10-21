@@ -13,6 +13,109 @@ Gestiona el ciclo de vida de los envíos, el historial de auditoría de estados 
 | Infra | Dockerfile multi-stage + docker-compose |
 
 ---
+## Modelo de dominio
+
+```mermaid
+classDiagram
+    direction LR
+
+    class BaseEntity {
+        <<abstract>>
+        -UUID id
+        -Long version
+        -Instant createdAt
+        -Instant updatedAt
+    }
+
+    class Cliente {
+        -String nombre
+        -String email
+        -String telefono
+        +actualizarContacto(String nombre, String telefono)
+    }
+
+    class Envio {
+        -String codigoSeguimiento
+        -BigDecimal pesoKg
+        -BigDecimal altoCm
+        -BigDecimal anchoCm
+        -BigDecimal largoCm
+        -BigDecimal tarifa
+        -EstadoEnvio estado
+        +calcularTarifa() BigDecimal
+        +puedeCancelarse() boolean
+        +cancelar()
+        +asignarRepartidor(Repartidor repartidor)
+        +cambiarEstado(EstadoEnvio nuevoEstado)
+    }
+
+    class Direccion {
+        <<Embeddable>>
+        -String calle
+        -String numero
+        -String ciudad
+        -String codigoPostal
+    }
+
+    class HistorialEstado {
+        -EstadoEnvio estadoAnterior
+        -EstadoEnvio estadoNuevo
+        -Instant fechaHora
+    }
+
+    class Repartidor {
+        -String nombre
+        -TipoVehiculo tipoVehiculo
+        -EstadoRepartidor estado
+        +estaActivo() boolean
+        +activar()
+        +desactivar()
+    }
+
+    class EstadoEnvio {
+        <<enumeration>>
+        PENDIENTE
+        EN_RUTA
+        ENTREGADO
+        CANCELADO
+        +transicionesPermitidas() Set
+        +puedeTransicionarA(EstadoEnvio destino) boolean
+        +esFinal() boolean
+    }
+
+    class EstadoRepartidor {
+        <<enumeration>>
+        ACTIVO
+        INACTIVO
+    }
+
+    class TipoVehiculo {
+        <<enumeration>>
+        BICICLETA
+        MOTO
+        AUTO
+        CAMIONETA
+    }
+
+    BaseEntity <|-- Cliente
+    BaseEntity <|-- Envio
+    BaseEntity <|-- Repartidor
+    BaseEntity <|-- HistorialEstado
+
+    Cliente "1" --> "*" Envio : realiza
+    Envio "*" --> "0..1" Repartidor : asignado_a
+    Envio *-- "1" Direccion : origen
+    Envio *-- "1" Direccion : destino
+    Envio "1" *-- "*" HistorialEstado : historial
+    Envio --> EstadoEnvio : estado
+    HistorialEstado --> EstadoEnvio : estadoAnterior / estadoNuevo
+    Repartidor --> EstadoRepartidor : estado
+    Repartidor --> TipoVehiculo : tipoVehiculo
+```
+
+Los cambios que hicimos respecto del modelo guía del PDF están explicados en la [sección 6](#6-modelo-de-dominio--cambios-respecto-del-modelo-guía).
+
+---
 
 ## 1. Requisitos
 
