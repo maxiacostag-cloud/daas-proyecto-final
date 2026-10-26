@@ -60,15 +60,7 @@ public class Repartidor extends BaseEntity {
         return estado == EstadoRepartidor.ACTIVO;
     }
 
-    public void activar() {
-        this.estado = EstadoRepartidor.ACTIVO;
-    }
-
-    /** Un repartidor inactivo no puede recibir nuevos envíos. */
-    public void desactivar() {
-        this.estado = EstadoRepartidor.INACTIVO;
-    }
-
+    /** Un repartidor INACTIVO no puede recibir nuevos envíos. */
     public void cambiarEstado(@NonNull EstadoRepartidor nuevoEstado) {
         this.estado = nuevoEstado;
     }

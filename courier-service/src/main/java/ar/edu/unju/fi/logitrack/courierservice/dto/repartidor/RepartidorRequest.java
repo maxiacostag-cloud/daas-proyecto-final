@@ -30,4 +30,15 @@ public record RepartidorRequest(
         @Size(min = 6, max = 30, message = "El teléfono debe tener entre 6 y 30 caracteres")
         String telefono
 ) {
+
+    /** Normaliza los textos una sola vez, antes de validar y de llegar al servicio. */
+    public RepartidorRequest {
+        nombre = quitarEspacios(nombre);
+        email = quitarEspacios(email);
+        telefono = quitarEspacios(telefono);
+    }
+
+    private static String quitarEspacios(String valor) {
+        return valor == null ? null : valor.strip();
+    }
 }
