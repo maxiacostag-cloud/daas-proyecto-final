@@ -34,11 +34,14 @@ CREATE TABLE IF NOT EXISTS repartidores (
     id             CHAR(36)     NOT NULL,
     nombre         VARCHAR(120) NOT NULL,
     tipo_vehiculo  VARCHAR(20)  NOT NULL,
+    email          VARCHAR(150) NOT NULL,
+    telefono       VARCHAR(30)  NOT NULL,
     estado         VARCHAR(20)  NOT NULL,
     version        BIGINT,
     created_at     DATETIME(6)  NOT NULL,
     updated_at     DATETIME(6),
-    CONSTRAINT pk_repartidores PRIMARY KEY (id)
+    CONSTRAINT pk_repartidores PRIMARY KEY (id),
+    CONSTRAINT uk_repartidores_email UNIQUE (email)
 );
 
 -- ---------------------------------------------------------------------
@@ -95,10 +98,10 @@ CREATE INDEX idx_historial_envio ON historial_estados (envio_id, fecha_hora);
 -- ---------------------------------------------------------------------
 -- Datos de prueba
 -- ---------------------------------------------------------------------
-INSERT INTO repartidores (id, nombre, tipo_vehiculo, estado, version, created_at, updated_at) VALUES
-    ('3f6c1a52-8e0b-4d7a-9c11-0a1b2c3d4e01', 'Lucía Fernández', 'MOTO',       'ACTIVO',   0, NOW(6), NOW(6)),
-    ('3f6c1a52-8e0b-4d7a-9c11-0a1b2c3d4e02', 'Martín Quispe',   'CAMIONETA',  'ACTIVO',   0, NOW(6), NOW(6)),
-    ('3f6c1a52-8e0b-4d7a-9c11-0a1b2c3d4e03', 'Sofía Mamaní',    'BICICLETA',  'INACTIVO', 0, NOW(6), NOW(6));
+INSERT INTO repartidores (id, nombre, tipo_vehiculo, email, telefono, estado, version, created_at, updated_at) VALUES
+    ('3f6c1a52-8e0b-4d7a-9c11-0a1b2c3d4e01', 'Lucía Fernández', 'MOTO',      'lucia.fernandez@logitrack.com', '+54 388 400-2001', 'ACTIVO',   0, NOW(6), NOW(6)),
+    ('3f6c1a52-8e0b-4d7a-9c11-0a1b2c3d4e02', 'Martín Quispe',   'CAMIONETA', 'martin.quispe@logitrack.com',   '+54 388 400-2002', 'ACTIVO',   0, NOW(6), NOW(6)),
+    ('3f6c1a52-8e0b-4d7a-9c11-0a1b2c3d4e03', 'Sofía Mamaní',    'BICICLETA', 'sofia.mamani@logitrack.com',    '+54 388 400-2003', 'INACTIVO', 0, NOW(6), NOW(6));
 
 INSERT INTO clientes (id, nombre, email, telefono, version, created_at, updated_at) VALUES
     ('7a2d9b10-1c3e-4f5a-8b6c-0d1e2f3a4b01', 'Tienda Norte SRL', 'ventas@tiendanorte.com', '+54 388 400-1000', 0, NOW(6), NOW(6));
@@ -117,19 +120,19 @@ INSERT INTO envios (id, codigo_seguimiento, cliente_id, repartidor_id,
     peso_kg, alto_cm, ancho_cm, largo_cm, tarifa, estado, version, created_at, updated_at) VALUES
     ('eeeeeeee-0000-4000-8000-000000000001', 'LT-2026-000001', '7a2d9b10-1c3e-4f5a-8b6c-0d1e2f3a4b01', NULL,
      'Belgrano', '120', 'San Salvador de Jujuy', '4600', 'Lavalle', '450', 'San Salvador de Jujuy', '4600',
-     2.500, 20.00, 30.00, 40.00, 3500.00, 'PENDIENTE', 0, NOW(6), NOW(6)),
+     2.500, 20.00, 30.00, 40.00, 3660.00, 'PENDIENTE', 0, NOW(6), NOW(6)),
     ('eeeeeeee-0000-4000-8000-000000000002', 'LT-2026-000002', '7a2d9b10-1c3e-4f5a-8b6c-0d1e2f3a4b01', NULL,
      'Alvear', '800', 'San Salvador de Jujuy', '4600', 'Güemes', '75', 'Palpalá', '4612',
-     8.000, 40.00, 50.00, 60.00, 6200.00, 'PENDIENTE', 0, NOW(6), NOW(6)),
+     8.000, 40.00, 50.00, 60.00, 12300.00, 'PENDIENTE', 0, NOW(6), NOW(6)),
     ('eeeeeeee-0000-4000-8000-000000000003', 'LT-2026-000003', '7a2d9b10-1c3e-4f5a-8b6c-0d1e2f3a4b01', '3f6c1a52-8e0b-4d7a-9c11-0a1b2c3d4e01',
      'Belgrano', '120', 'San Salvador de Jujuy', '4600', 'Sarmiento', '300', 'San Salvador de Jujuy', '4600',
-     1.200, 10.00, 20.00, 25.00, 2800.00, 'EN_RUTA', 0, NOW(6), NOW(6)),
+     1.200, 10.00, 20.00, 25.00, 2040.00, 'EN_RUTA', 0, NOW(6), NOW(6)),
     ('eeeeeeee-0000-4000-8000-000000000004', 'LT-2026-000004', '7a2d9b10-1c3e-4f5a-8b6c-0d1e2f3a4b01', '3f6c1a52-8e0b-4d7a-9c11-0a1b2c3d4e02',
      'Alvear', '800', 'San Salvador de Jujuy', '4600', 'Necochea', '210', 'San Salvador de Jujuy', '4600',
-     0.500, 5.00, 15.00, 20.00, 2000.00, 'ENTREGADO', 0, NOW(6), NOW(6)),
+     0.500, 5.00, 15.00, 20.00, 1725.00, 'ENTREGADO', 0, NOW(6), NOW(6)),
     ('eeeeeeee-0000-4000-8000-000000000005', 'LT-2026-000005', '7a2d9b10-1c3e-4f5a-8b6c-0d1e2f3a4b01', NULL,
      'Belgrano', '120', 'San Salvador de Jujuy', '4600', 'Balcarce', '90', 'Yala', '4600',
-     4.000, 25.00, 35.00, 45.00, 4100.00, 'CANCELADO', 0, NOW(6), NOW(6));
+     4.000, 25.00, 35.00, 45.00, 5043.75, 'CANCELADO', 0, NOW(6), NOW(6));
 
 INSERT INTO historial_estados (id, envio_id, estado_anterior, estado_nuevo, fecha_hora, version, created_at, updated_at) VALUES
     ('ffffffff-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000001', NULL, 'PENDIENTE', NOW(6), 0, NOW(6), NOW(6)),

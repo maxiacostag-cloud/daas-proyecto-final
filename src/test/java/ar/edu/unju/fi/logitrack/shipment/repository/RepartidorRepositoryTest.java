@@ -41,4 +41,20 @@ class RepartidorRepositoryTest {
                 .extracting(Repartidor::getEstado)
                 .isEqualTo(EstadoRepartidor.ACTIVO);
     }
+
+    @Test
+    void existsByEmail_ignoraMayusculas() {
+        Repartidor guardado = repartidorRepository.save(TestDataFactory.repartidorActivo());
+
+        assertThat(repartidorRepository.existsByEmailIgnoreCase(guardado.getEmail().toUpperCase())).isTrue();
+        assertThat(repartidorRepository.existsByEmailIgnoreCase("nadie@logitrack.test")).isFalse();
+    }
+
+    @Test
+    void existsByEmailAndIdNot_permiteElPropioEmail() {
+        Repartidor guardado = repartidorRepository.save(TestDataFactory.repartidorActivo());
+
+        assertThat(repartidorRepository.existsByEmailIgnoreCaseAndIdNot(guardado.getEmail(), guardado.getId())).isFalse();
+        assertThat(repartidorRepository.existsByEmailIgnoreCaseAndIdNot(guardado.getEmail(), java.util.UUID.randomUUID())).isTrue();
+    }
 }

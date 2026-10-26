@@ -61,8 +61,8 @@ class GestionRepartidoresIntegrationTest {
 
     private String registrarRepartidor(String nombre) throws Exception {
         String body = """
-                {"nombre": "%s", "tipoVehiculo": "MOTO"}
-                """.formatted(nombre);
+                {"nombre": "%s", "tipoVehiculo": "MOTO", "email": "%s@logitrack.test", "telefono": "+54 388 400-2000"}
+                """.formatted(nombre, UUID.randomUUID());
         String respuesta = mockMvc.perform(post("/api/v1/repartidores")
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated())
@@ -90,6 +90,28 @@ class GestionRepartidoresIntegrationTest {
 
     private String asignacionBody(String repartidorId) {
         return "{\"repartidorId\":\"" + repartidorId + "\"}";
+    }
+
+    @Test
+    @DisplayName("email único: registrar dos repartidores con el mismo email devuelve 409 y se puede actualizar el contacto")
+    void emailUnicoYActualizacion() throws Exception {
+        String body = """
+                {"nombre": "Ana Torres", "tipoVehiculo": "AUTO", "email": "ana@logitrack.test", "telefono": "+54 388 400-5000"}
+                """;
+        String creado = mockMvc.perform(post("/api/v1/repartidores").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.email").value("ana@logitrack.test"))
+                .andReturn().getResponse().getContentAsString();
+        String id = JsonPath.read(creado, "$.id");
+
+        mockMvc.perform(post("/api/v1/repartidores").contentType(MediaType.APPLICATION_JSON)
+                        .content(body.replace("Ana Torres", "Otra Persona").replace("ana@", "ANA@")))
+                .andExpect(status().isConflict());
+
+        mockMvc.perform(put("/api/v1/repartidores/{id}", id).contentType(MediaType.APPLICATION_JSON)
+                        .content(body.replace("+54 388 400-5000", "+54 388 400-9999")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.telefono").value("+54 388 400-9999"));
     }
 
     @Test

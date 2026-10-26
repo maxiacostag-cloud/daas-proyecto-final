@@ -16,16 +16,31 @@ Content-Type: application/json
 
 {
   "nombre": "Pedro Ramírez",
-  "tipoVehiculo": "MOTO"
+  "tipoVehiculo": "MOTO",
+  "email": "pedro.ramirez@logitrack.com",
+  "telefono": "+54 388 400-2010"
 }
 
-### 1.2. Registrar con datos inválidos (nombre vacío) -> 400 Bad Request
+### 1.1.b. Registrar otro repartidor con el mismo email -> 409 Conflict
+POST {{host}}/api/v1/repartidores
+Content-Type: application/json
+
+{
+  "nombre": "Otra Persona",
+  "tipoVehiculo": "AUTO",
+  "email": "PEDRO.RAMIREZ@logitrack.com",
+  "telefono": "+54 388 400-2011"
+}
+
+### 1.2. Registrar con datos inválidos (nombre vacío, email mal formado) -> 400 Bad Request
 POST {{host}}/api/v1/repartidores
 Content-Type: application/json
 
 {
   "nombre": "",
-  "tipoVehiculo": "MOTO"
+  "tipoVehiculo": "MOTO",
+  "email": "no-es-un-email",
+  "telefono": ""
 }
 
 ### 1.3. Registrar con tipo de vehículo inexistente -> 400 Bad Request
@@ -34,8 +49,24 @@ Content-Type: application/json
 
 {
   "nombre": "Carlos Díaz",
-  "tipoVehiculo": "AVION"
+  "tipoVehiculo": "AVION",
+  "email": "carlos.diaz@logitrack.com",
+  "telefono": "+54 388 400-2012"
 }
+
+### 1.3.b. Actualizar el contacto de Lucía Fernández -> 200 OK
+PUT {{host}}/api/v1/repartidores/3f6c1a52-8e0b-4d7a-9c11-0a1b2c3d4e01
+Content-Type: application/json
+
+{
+  "nombre": "Lucía Fernández",
+  "tipoVehiculo": "MOTO",
+  "email": "lucia.fernandez@logitrack.com",
+  "telefono": "+54 388 400-9999"
+}
+
+### 1.3.c. Hoja de ruta de Lucía (sus envíos EN_RUTA) -> 200 OK
+GET {{host}}/api/v1/envios?repartidorId=3f6c1a52-8e0b-4d7a-9c11-0a1b2c3d4e01&estado=EN_RUTA
 
 ### 1.4. Listar todos los repartidores -> 200 OK
 GET {{host}}/api/v1/repartidores

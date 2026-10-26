@@ -10,11 +10,13 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -34,19 +36,10 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/repartidores")
 @Tag(name = "Repartidores", description = "Alta y consulta del personal de entrega")
+@RequiredArgsConstructor
 public class RepartidorController {
 
-    // Dependencia del servicio inyectada por constructor
     private final RepartidorService repartidorService;
-
-    /**
-     * Inyección de dependencias mediante constructor (Buena práctica Spring).
-     *
-     * @param repartidorService Servicio con la lógica de negocio de repartidores.
-     */
-    public RepartidorController(RepartidorService repartidorService) {
-        this.repartidorService = repartidorService;
-    }
 
     /**
      * POST /api/v1/repartidores - Registrar un nuevo repartidor en el sistema.
@@ -62,6 +55,7 @@ public class RepartidorController {
     @Operation(summary = "Registrar un repartidor (queda ACTIVO)")
     @ApiResponse(responseCode = "201", description = "Repartidor creado exitosamente")
     @ApiResponse(responseCode = "400", description = "Datos de solicitud inválidos o incompletos")
+    @ApiResponse(responseCode = "409", description = "Ya existe un repartidor con ese email")
     public ResponseEntity<RepartidorResponse> registrar(@Valid @RequestBody RepartidorRequest request) {
         // Invoca el servicio para procesar el registro
         RepartidorResponse creado = repartidorService.registrar(request);
@@ -105,6 +99,17 @@ public class RepartidorController {
     public ResponseEntity<RepartidorResponse> obtener(@PathVariable UUID id) {
         RepartidorResponse repartidor = repartidorService.obtenerPorId(id);
         return ResponseEntity.ok(repartidor);
+    }
+
+    @PutMapping("/{id}")
+    @Operation(summary = "Actualizar los datos de un repartidor (nombre, vehículo, email y teléfono)")
+    @ApiResponse(responseCode = "200", description = "Repartidor actualizado")
+    @ApiResponse(responseCode = "400", description = "Datos de solicitud inválidos o incompletos")
+    @ApiResponse(responseCode = "404", description = "No existe el repartidor")
+    @ApiResponse(responseCode = "409", description = "El email ya pertenece a otro repartidor")
+    public ResponseEntity<RepartidorResponse> actualizar(
+            @PathVariable UUID id, @Valid @RequestBody RepartidorRequest request) {
+        return ResponseEntity.ok(repartidorService.actualizar(id, request));
     }
 
     @PatchMapping("/{id}/estado")

@@ -10,6 +10,8 @@ public record RepartidorResponse(
         UUID id,
         String nombre,
         TipoVehiculo tipoVehiculo,
+        String email,
+        String telefono,
         EstadoRepartidor estado,
         Instant createdAt,
         Instant updatedAt

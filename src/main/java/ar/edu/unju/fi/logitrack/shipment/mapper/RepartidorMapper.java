@@ -10,9 +10,14 @@ import org.springframework.stereotype.Component;
 public class RepartidorMapper {
 
     public Repartidor toEntity(RepartidorRequest request) {
-        return new Repartidor(request.nombre().trim(), request.tipoVehiculo());
+        return new Repartidor(
+                request.nombre().trim(),
+                request.tipoVehiculo(),
+                request.email().trim(),
+                request.telefono().trim());
     }
 
+    /** Devuelve {@code null} si no hay repartidor (por ejemplo, un envío todavía sin asignar). */
     public RepartidorResponse toResponse(Repartidor repartidor) {
         if (repartidor == null) {
             return null;
@@ -21,6 +26,8 @@ public class RepartidorMapper {
                 repartidor.getId(),
                 repartidor.getNombre(),
                 repartidor.getTipoVehiculo(),
+                repartidor.getEmail(),
+                repartidor.getTelefono(),
                 repartidor.getEstado(),
                 repartidor.getCreatedAt(),
                 repartidor.getUpdatedAt());

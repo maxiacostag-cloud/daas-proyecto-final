@@ -3,6 +3,7 @@ package ar.edu.unju.fi.logitrack.shipment.unit;
 import ar.edu.unju.fi.logitrack.shipment.dto.envio.CambiarEstadoRequest;
 import ar.edu.unju.fi.logitrack.shipment.dto.envio.DatosClienteRequest;
 import ar.edu.unju.fi.logitrack.shipment.dto.envio.EnvioResponse;
+import ar.edu.unju.fi.logitrack.shipment.dto.envio.DireccionResponse;
 import ar.edu.unju.fi.logitrack.shipment.dto.envio.HistorialEstadoResponse;
 import ar.edu.unju.fi.logitrack.shipment.dto.envio.RegistrarEnvioRequest;
 import ar.edu.unju.fi.logitrack.shipment.entity.*;
@@ -13,7 +14,7 @@ import ar.edu.unju.fi.logitrack.shipment.exception.InvalidStateTransitionExcepti
 import ar.edu.unju.fi.logitrack.shipment.exception.ResourceNotFoundException;
 import ar.edu.unju.fi.logitrack.shipment.mapper.EnvioMapper;
 import ar.edu.unju.fi.logitrack.shipment.repository.*;
-import ar.edu.unju.fi.logitrack.shipment.service.ShipmentServiceImpl;
+import ar.edu.unju.fi.logitrack.shipment.service.impl.ShipmentServiceImpl;
 import ar.edu.unju.fi.logitrack.shipment.service.TrackingCodeGenerator;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -27,6 +28,7 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -57,9 +59,6 @@ class ShipmentServiceTest {
 
     @Mock
     private ClienteRepository clienteRepository;
-
-    @Mock
-    private RepartidorRepository repartidorRepository;
 
     @Mock
     private HistorialEstadoRepository historialEstadoRepository;
@@ -131,14 +130,19 @@ class ShipmentServiceTest {
         RegistrarEnvioRequest request = new RegistrarEnvioRequest(
             clienteId, "Calle 1", "123", "Jujuy", "4600",
             "Calle 2", "456", "Jujuy", "4600",
-            2.5, 10.0, 10.0, 10.0
+            new BigDecimal("2.5"), new BigDecimal("10"), new BigDecimal("10"), new BigDecimal("10"),
+            null
         );
 
         // Definición de comportamientos esperados de los Mocks (Stubbing)
         when(clienteRepository.findById(clienteId)).thenReturn(Optional.of(clienteEjemplo));
         when(envioRepository.save(any(Envio.class))).thenReturn(envioEjemplo);
         when(envioMapper.toResponse(any(Envio.class))).thenReturn(new EnvioResponse(
-            UUID.randomUUID(), "TRK-12345678", 2.5, EstadoEnvio.PENDIENTE, clienteId, null, "Jujuy", "Jujuy", new BigDecimal("2625.00")
+            UUID.randomUUID(), "TRK-12345678", EstadoEnvio.PENDIENTE, clienteId, null,
+            new DireccionResponse("Calle 1", "123", "Jujuy", "4600"),
+            new DireccionResponse("Calle 2", "456", "Jujuy", "4600"),
+            new BigDecimal("2.5"), new BigDecimal("10"), new BigDecimal("10"), new BigDecimal("10"),
+            new BigDecimal("2625.00"), Instant.now()
         ));
 
         // WHEN (Cuando): Ejecución del método bajo prueba
@@ -183,8 +187,7 @@ class ShipmentServiceTest {
     void testCancelarEnvioInvalidoLanzaExcepcion() {
         // GIVEN (Dado): Un envío que ya posee un repartidor asignado y se encuentra EN_RUTA
         UUID envioId = UUID.randomUUID();
-        Repartidor repartidor = new Repartidor("Pedro", "pedro@gmail.com", "3889999999");
-        repartidor.activar();
+        Repartidor repartidor = new Repartidor("Pedro", TipoVehiculo.MOTO, "pedro@logitrack.test", "+54 388 400-2000");
 
         // Transiciones del modelo de dominio
         envioEjemplo.asignarRepartidor(repartidor);
@@ -216,7 +219,8 @@ class ShipmentServiceTest {
         return new RegistrarEnvioRequest(
             clienteId, "Calle 1", "123", "Jujuy", "4600",
             "Calle 2", "456", "Jujuy", "4600",
-            peso, ancho, alto, largo
+            BigDecimal.valueOf(peso), BigDecimal.valueOf(ancho), BigDecimal.valueOf(alto), BigDecimal.valueOf(largo),
+            null
         );
     }
 
@@ -247,7 +251,7 @@ class ShipmentServiceTest {
      * porque sin repartidor no puede salir a la calle.
      */
     private void ponerEnvioEnRuta() {
-        envioEjemplo.asignarRepartidor(new Repartidor("Pedro", TipoVehiculo.MOTO));
+        envioEjemplo.asignarRepartidor(new Repartidor("Pedro", TipoVehiculo.MOTO, "pedro@logitrack.test", "+54 388 400-2000"));
         envioEjemplo.cambiarEstado(EstadoEnvio.EN_RUTA);
     }
 
@@ -297,7 +301,7 @@ class ShipmentServiceTest {
     @DisplayName("Estados: un envío PENDIENTE con repartidor pasa a EN_RUTA")
     void testCambiarEstadoDePendienteAEnRuta() {
         UUID envioId = UUID.randomUUID();
-        envioEjemplo.asignarRepartidor(new Repartidor("Pedro", TipoVehiculo.MOTO));
+        envioEjemplo.asignarRepartidor(new Repartidor("Pedro", TipoVehiculo.MOTO, "pedro@logitrack.test", "+54 388 400-2000"));
         when(envioRepository.findById(envioId)).thenReturn(Optional.of(envioEjemplo));
         when(envioRepository.save(any(Envio.class))).thenAnswer(invocacion -> invocacion.getArgument(0));
 
@@ -416,7 +420,7 @@ class ShipmentServiceTest {
     @DisplayName("Historial: cada cambio de estado agrega un registro de auditoría")
     void testCadaCambioDeEstadoQuedaEnElHistorial() {
         UUID envioId = UUID.randomUUID();
-        envioEjemplo.asignarRepartidor(new Repartidor("Pedro", TipoVehiculo.MOTO));
+        envioEjemplo.asignarRepartidor(new Repartidor("Pedro", TipoVehiculo.MOTO, "pedro@logitrack.test", "+54 388 400-2000"));
         when(envioRepository.findById(envioId)).thenReturn(Optional.of(envioEjemplo));
         when(envioRepository.save(any(Envio.class))).thenAnswer(invocacion -> invocacion.getArgument(0));
 
@@ -447,7 +451,7 @@ class ShipmentServiceTest {
         when(historialEstadoRepository.findByEnvioIdOrderByFechaHoraDesc(envioId)).thenReturn(registros);
         when(envioMapper.toHistorialResponse(any(HistorialEstado.class))).thenAnswer(invocacion -> {
             HistorialEstado registro = invocacion.getArgument(0);
-            return new HistorialEstadoResponse(registro.getEstadoAnterior(), registro.getEstadoNuevo(), null, "prueba");
+            return new HistorialEstadoResponse(registro.getEstadoAnterior(), registro.getEstadoNuevo(), registro.getFechaHora());
         });
 
         List<HistorialEstadoResponse> historial = shipmentService.obtenerHistorial(envioId);
@@ -483,7 +487,7 @@ class ShipmentServiceTest {
         return new RegistrarEnvioRequest(
             null, "Calle 1", "123", "Jujuy", "4600",
             "Calle 2", "456", "Jujuy", "4600",
-            2.5, 10.0, 10.0, 10.0,
+            new BigDecimal("2.5"), new BigDecimal("10"), new BigDecimal("10"), new BigDecimal("10"),
             datos
         );
     }
@@ -565,5 +569,50 @@ class ShipmentServiceTest {
         registrarYObtenerEnvioGuardado(2.5, 10.0, 10.0, 10.0);
 
         verify(trackingCodeGenerator, times(2)).generar();
+    }
+
+    // =========================================================================
+    // LISTADO CON FILTROS
+    // =========================================================================
+
+    @Test
+    @DisplayName("Listar: sin filtros devuelve todos los envíos")
+    void testListarSinFiltros() {
+        when(envioRepository.findAll()).thenReturn(List.of(envioEjemplo));
+
+        assertEquals(1, shipmentService.listar(null, null).size());
+
+        verify(envioRepository, never()).findByEstadoOrderByCreatedAtDesc(any());
+    }
+
+    @Test
+    @DisplayName("Listar: filtra solo por estado")
+    void testListarPorEstado() {
+        when(envioRepository.findByEstadoOrderByCreatedAtDesc(EstadoEnvio.PENDIENTE)).thenReturn(List.of(envioEjemplo));
+
+        assertEquals(1, shipmentService.listar(EstadoEnvio.PENDIENTE, null).size());
+
+        verify(envioRepository, never()).findAll();
+    }
+
+    @Test
+    @DisplayName("Listar: filtra solo por repartidor")
+    void testListarPorRepartidor() {
+        UUID repartidorId = UUID.randomUUID();
+        when(envioRepository.findByRepartidorIdOrderByCreatedAtDesc(repartidorId)).thenReturn(List.of(envioEjemplo));
+
+        assertEquals(1, shipmentService.listar(null, repartidorId).size());
+
+        verify(envioRepository, never()).findAll();
+    }
+
+    @Test
+    @DisplayName("Listar: combina repartidor y estado")
+    void testListarPorRepartidorYEstado() {
+        UUID repartidorId = UUID.randomUUID();
+        when(envioRepository.findByRepartidorIdAndEstadoOrderByCreatedAtDesc(repartidorId, EstadoEnvio.EN_RUTA))
+            .thenReturn(List.of(envioEjemplo, envioEjemplo));
+
+        assertEquals(2, shipmentService.listar(EstadoEnvio.EN_RUTA, repartidorId).size());
     }
 }

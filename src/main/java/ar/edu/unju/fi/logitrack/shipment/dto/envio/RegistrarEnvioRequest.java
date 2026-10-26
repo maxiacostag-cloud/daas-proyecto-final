@@ -2,64 +2,49 @@ package ar.edu.unju.fi.logitrack.shipment.dto.envio;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
+
+import java.math.BigDecimal;
 import java.util.UUID;
 
 /**
  * Datos que se reciben para registrar un envío nuevo.
  * <p>
- * El cliente se puede indicar de dos formas: con el {@code clienteId} de un cliente que ya existe,
- * o mandando sus datos en {@code cliente}. Si llegan los dos, se usa el {@code clienteId}.
+ * El cliente se indica con el {@code clienteId} de un cliente existente o mandando sus datos en
+ * {@code cliente}. Si llegan los dos, se usa el {@code clienteId}.
  * </p>
- *
- * @param clienteId id de un cliente ya registrado, puede venir vacío si se mandan los datos del cliente
- * @param origenCalle calle de origen
- * @param origenNumero número de la calle de origen
- * @param origenCiudad ciudad de origen
- * @param origenCodigoPostal código postal de origen
- * @param destinoCalle calle de destino
- * @param destinoNumero número de la calle de destino
- * @param destinoCiudad ciudad de destino
- * @param destinoCodigoPostal código postal de destino
- * @param peso peso real del paquete en kilos
- * @param ancho ancho del paquete en centímetros
- * @param alto alto del paquete en centímetros
- * @param largo largo del paquete en centímetros
- * @param cliente datos del cliente, se usan cuando no se manda el clienteId
  */
 public record RegistrarEnvioRequest(
+
     @Schema(description = "Id de un cliente ya registrado. Puede quedar vacío si se mandan los datos del cliente.")
     UUID clienteId,
-    @NotNull String origenCalle,
-    @NotNull String origenNumero,
-    @NotNull String origenCiudad,
-    @NotNull String origenCodigoPostal,
-    @NotNull String destinoCalle,
-    @NotNull String destinoNumero,
-    @NotNull String destinoCiudad,
-    @NotNull String destinoCodigoPostal,
-    @NotNull @Positive Double peso,
-    @NotNull @Positive Double ancho,
-    @NotNull @Positive Double alto,
-    @NotNull @Positive Double largo,
+
+    @NotBlank @Size(max = 120) String origenCalle,
+    @NotBlank @Size(max = 10) String origenNumero,
+    @NotBlank @Size(max = 80) String origenCiudad,
+    @NotBlank @Size(max = 10) String origenCodigoPostal,
+
+    @NotBlank @Size(max = 120) String destinoCalle,
+    @NotBlank @Size(max = 10) String destinoNumero,
+    @NotBlank @Size(max = 80) String destinoCiudad,
+    @NotBlank @Size(max = 10) String destinoCodigoPostal,
+
+    @Schema(description = "Peso real en kilos", example = "2.5")
+    @NotNull @DecimalMin(value = "0.001") @Digits(integer = 7, fraction = 3) BigDecimal peso,
+
+    @Schema(description = "Ancho en centímetros", example = "30")
+    @NotNull @DecimalMin(value = "0.01") @Digits(integer = 8, fraction = 2) BigDecimal ancho,
+
+    @Schema(description = "Alto en centímetros", example = "20")
+    @NotNull @DecimalMin(value = "0.01") @Digits(integer = 8, fraction = 2) BigDecimal alto,
+
+    @Schema(description = "Largo en centímetros", example = "40")
+    @NotNull @DecimalMin(value = "0.01") @Digits(integer = 8, fraction = 2) BigDecimal largo,
+
     @Schema(description = "Datos del cliente. Se usan cuando no se manda el clienteId.")
     @Valid DatosClienteRequest cliente
-) {
-
-    /**
-     * Crea el pedido solo con el {@code clienteId}, sin los datos del cliente.
-     * <p>
-     * Lo dejamos para que el código que ya registraba envíos de esta forma (por ejemplo los tests)
-     * siga funcionando igual que antes.
-     * </p>
-     */
-    public RegistrarEnvioRequest(UUID clienteId,
-                                 String origenCalle, String origenNumero, String origenCiudad, String origenCodigoPostal,
-                                 String destinoCalle, String destinoNumero, String destinoCiudad, String destinoCodigoPostal,
-                                 Double peso, Double ancho, Double alto, Double largo) {
-        this(clienteId, origenCalle, origenNumero, origenCiudad, origenCodigoPostal,
-            destinoCalle, destinoNumero, destinoCiudad, destinoCodigoPostal,
-            peso, ancho, alto, largo, null);
-    }
-}
+) {}

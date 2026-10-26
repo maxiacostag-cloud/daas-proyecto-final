@@ -3,9 +3,13 @@ package ar.edu.unju.fi.logitrack.shipment.entity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.NonNull;
 
-import java.util.Objects;
-
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "clientes")
 public class Cliente extends BaseEntity {
@@ -19,30 +23,14 @@ public class Cliente extends BaseEntity {
     @Column(length = 30)
     private String telefono;
 
-    protected Cliente() {
-        // requerido por JPA
-    }
-
-    public Cliente(String nombre, String email, String telefono) {
-        this.nombre = Objects.requireNonNull(nombre, "nombre");
-        this.email = Objects.requireNonNull(email, "email").toLowerCase();
+    public Cliente(@NonNull String nombre, @NonNull String email, String telefono) {
+        this.nombre = nombre;
+        this.email = email.toLowerCase();
         this.telefono = telefono;
     }
 
-    public void actualizarContacto(String nombre, String telefono) {
-        this.nombre = Objects.requireNonNull(nombre, "nombre");
+    public void actualizarContacto(@NonNull String nombre, String telefono) {
+        this.nombre = nombre;
         this.telefono = telefono;
-    }
-
-    public String getNombre() {
-        return nombre;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public String getTelefono() {
-        return telefono;
     }
 }
