@@ -28,24 +28,9 @@ CREATE TABLE IF NOT EXISTS clientes (
 );
 
 -- ---------------------------------------------------------------------
--- Repartidores
--- ---------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS repartidores (
-    id             CHAR(36)     NOT NULL,
-    nombre         VARCHAR(120) NOT NULL,
-    tipo_vehiculo  VARCHAR(20)  NOT NULL,
-    email          VARCHAR(150) NOT NULL,
-    telefono       VARCHAR(30)  NOT NULL,
-    estado         VARCHAR(20)  NOT NULL,
-    version        BIGINT,
-    created_at     DATETIME(6)  NOT NULL,
-    updated_at     DATETIME(6),
-    CONSTRAINT pk_repartidores PRIMARY KEY (id),
-    CONSTRAINT uk_repartidores_email UNIQUE (email)
-);
-
--- ---------------------------------------------------------------------
 -- Envíos (origen y destino son Value Objects embebidos)
+-- repartidor_id es solo una referencia: el repartidor vive en la base
+-- de courier-service (logitrack_couriers), no hay FK entre microservicios.
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS envios (
     id                    CHAR(36)      NOT NULL,
@@ -71,8 +56,7 @@ CREATE TABLE IF NOT EXISTS envios (
     updated_at            DATETIME(6),
     CONSTRAINT pk_envios PRIMARY KEY (id),
     CONSTRAINT uk_envios_codigo UNIQUE (codigo_seguimiento),
-    CONSTRAINT fk_envios_cliente FOREIGN KEY (cliente_id) REFERENCES clientes (id),
-    CONSTRAINT fk_envios_repartidor FOREIGN KEY (repartidor_id) REFERENCES repartidores (id)
+    CONSTRAINT fk_envios_cliente FOREIGN KEY (cliente_id) REFERENCES clientes (id)
 );
 
 CREATE INDEX idx_envios_estado ON envios (estado);
@@ -98,21 +82,16 @@ CREATE INDEX idx_historial_envio ON historial_estados (envio_id, fecha_hora);
 -- ---------------------------------------------------------------------
 -- Datos de prueba
 -- ---------------------------------------------------------------------
-INSERT INTO repartidores (id, nombre, tipo_vehiculo, email, telefono, estado, version, created_at, updated_at) VALUES
-    ('3f6c1a52-8e0b-4d7a-9c11-0a1b2c3d4e01', 'Lucía Fernández', 'MOTO',      'lucia.fernandez@logitrack.com', '+54 388 400-2001', 'ACTIVO',   0, NOW(6), NOW(6)),
-    ('3f6c1a52-8e0b-4d7a-9c11-0a1b2c3d4e02', 'Martín Quispe',   'CAMIONETA', 'martin.quispe@logitrack.com',   '+54 388 400-2002', 'ACTIVO',   0, NOW(6), NOW(6)),
-    ('3f6c1a52-8e0b-4d7a-9c11-0a1b2c3d4e03', 'Sofía Mamaní',    'BICICLETA', 'sofia.mamani@logitrack.com',    '+54 388 400-2003', 'INACTIVO', 0, NOW(6), NOW(6));
-
 INSERT INTO clientes (id, nombre, email, telefono, version, created_at, updated_at) VALUES
     ('7a2d9b10-1c3e-4f5a-8b6c-0d1e2f3a4b01', 'Tienda Norte SRL', 'ventas@tiendanorte.com', '+54 388 400-1000', 0, NOW(6), NOW(6));
 
 -- ---------------------------------------------------------------------
--- Envíos de prueba para demo (Issue 3)
--- 0001: PENDIENTE sin repartidor (para probar asignación exitosa)
--- 0002: PENDIENTE sin repartidor (para probar rechazo de repartidor inactivo)
--- 0003: EN_RUTA con Lucía Fernández (rechaza asignación; Lucía no se puede desactivar)
--- 0004: ENTREGADO (rechaza asignación)
--- 0005: CANCELADO (rechaza asignación)
+-- Envíos de prueba para demo (el repartidor_id apunta a logitrack_couriers)
+-- 0001: PENDIENTE sin repartidor (asignación exitosa)
+-- 0002: PENDIENTE sin repartidor (rechazo de repartidor inactivo)
+-- 0003: EN_RUTA con Lucía Fernández
+-- 0004: ENTREGADO
+-- 0005: CANCELADO
 -- ---------------------------------------------------------------------
 INSERT INTO envios (id, codigo_seguimiento, cliente_id, repartidor_id,
     origen_calle, origen_numero, origen_ciudad, origen_codigo_postal,
