@@ -1,6 +1,9 @@
 package ar.edu.unju.fi.logitrack.shipment.controller;
 
-import ar.edu.unju.fi.logitrack.shipment.dto.envio.*;
+import ar.edu.unju.fi.logitrack.shipment.dto.envio.CambiarEstadoRequest;
+import ar.edu.unju.fi.logitrack.shipment.dto.envio.EnvioResponse;
+import ar.edu.unju.fi.logitrack.shipment.dto.envio.HistorialEstadoResponse;
+import ar.edu.unju.fi.logitrack.shipment.dto.envio.RegistrarEnvioRequest;
 import ar.edu.unju.fi.logitrack.shipment.entity.enums.EstadoEnvio;
 import ar.edu.unju.fi.logitrack.shipment.service.ShipmentService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -8,10 +11,19 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 
@@ -21,13 +33,10 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/envios")
 @Tag(name = "Envíos", description = "Registro, consulta, cambios de estado e historial de los envíos")
+@RequiredArgsConstructor
 public class ShipmentController {
 
     private final ShipmentService shipmentService;
-
-    public ShipmentController(ShipmentService shipmentService) {
-        this.shipmentService = shipmentService;
-    }
 
     /**
      * POST /api/v1/envios - Registrar un nuevo envío.
@@ -40,7 +49,11 @@ public class ShipmentController {
     @ApiResponse(responseCode = "422", description = "No se indicó el clienteId ni los datos del cliente")
     public ResponseEntity<EnvioResponse> registrarEnvio(@Valid @RequestBody RegistrarEnvioRequest request) {
         EnvioResponse nuevoEnvio = shipmentService.registrarEnvio(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(nuevoEnvio);
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
+            .path("/{id}")
+            .buildAndExpand(nuevoEnvio.id())
+            .toUri();
+        return ResponseEntity.created(location).body(nuevoEnvio);
     }
 
     /**
@@ -66,15 +79,18 @@ public class ShipmentController {
     }
 
     /**
-     * GET /api/v1/envios?estado=PENDIENTE - Listar envíos (filtrado opcional por estado).
+     * GET /api/v1/envios?estado=EN_RUTA&repartidorId=... - Listar envíos con filtros opcionales y combinables.
      */
     @GetMapping
-    @Operation(summary = "Listar envíos, se puede filtrar por estado")
+    @Operation(summary = "Listar envíos, se puede filtrar por estado y por repartidor asignado")
     @ApiResponse(responseCode = "200", description = "Lista de envíos (vacía si no hay ninguno)")
-    public ResponseEntity<List<EnvioResponse>> listarPorEstado(
-        @Parameter(description = "PENDIENTE, EN_RUTA, ENTREGADO o CANCELADO. Si no se manda, devuelve todos.")
-        @RequestParam(required = false) EstadoEnvio estado) {
-        return ResponseEntity.ok(shipmentService.listarPorEstado(estado));
+    @ApiResponse(responseCode = "400", description = "Estado o repartidorId con formato inválido")
+    public ResponseEntity<List<EnvioResponse>> listar(
+        @Parameter(description = "PENDIENTE, EN_RUTA, ENTREGADO o CANCELADO. Si no se manda, no filtra por estado.")
+        @RequestParam(required = false) EstadoEnvio estado,
+        @Parameter(description = "Id del repartidor: devuelve solo sus envíos asignados (su hoja de ruta).")
+        @RequestParam(required = false) UUID repartidorId) {
+        return ResponseEntity.ok(shipmentService.listar(estado, repartidorId));
     }
 
     /**

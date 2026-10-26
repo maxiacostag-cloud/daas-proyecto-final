@@ -3,7 +3,24 @@ package ar.edu.unju.fi.logitrack.shipment.entity;
 import ar.edu.unju.fi.logitrack.shipment.entity.enums.EstadoEnvio;
 import ar.edu.unju.fi.logitrack.shipment.exception.BusinessRuleException;
 import ar.edu.unju.fi.logitrack.shipment.exception.InvalidStateTransitionException;
-import jakarta.persistence.*;
+import jakarta.persistence.AttributeOverride;
+import jakarta.persistence.AttributeOverrides;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
+import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.NonNull;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -11,29 +28,24 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "envios")
 public class Envio extends BaseEntity {
 
-    /**
-     * Monto fijo que se cobra por cualquier envío, sin importar el paquete.
-     * TODO: confirmar con el profe o con el equipo si este valor está bien o hay que cambiarlo.
-     */
-    static final BigDecimal TARIFA_BASE = new BigDecimal("1500.00");
+    /** Monto fijo que se cobra por cualquier envío, sin importar el paquete. */
+    private static final BigDecimal TARIFA_BASE = new BigDecimal("1500.00");
 
-    /**
-     * Precio que se suma por cada kilo que se cobra.
-     * TODO: confirmar con el profe o con el equipo si este valor está bien o hay que cambiarlo.
-     */
-    static final BigDecimal PRECIO_POR_KG = new BigDecimal("450.00");
+    /** Precio que se suma por cada kilo que se cobra. */
+    private static final BigDecimal PRECIO_POR_KG = new BigDecimal("450.00");
 
     /**
      * Número por el que se divide el volumen del paquete (en cm³) para sacar su peso volumétrico.
      * Es el valor que usan normalmente las empresas de envíos.
      */
-    static final BigDecimal DIVISOR_VOLUMETRICO = new BigDecimal("5000");
+    private static final BigDecimal DIVISOR_VOLUMETRICO = new BigDecimal("5000");
 
     @Column(name = "codigo_seguimiento", nullable = false, unique = true, length = 20, updatable = false)
     private String codigoSeguimiento;
@@ -91,15 +103,13 @@ public class Envio extends BaseEntity {
     @OrderBy("fechaHora ASC")
     private List<HistorialEstado> historial = new ArrayList<>();
 
-    protected Envio() {
-    }
-
-    public Envio(String codigoSeguimiento, Cliente cliente, Direccion origen, Direccion destino,
+    public Envio(@NonNull String codigoSeguimiento, @NonNull Cliente cliente,
+                 @NonNull Direccion origen, @NonNull Direccion destino,
                  BigDecimal pesoKg, BigDecimal altoCm, BigDecimal anchoCm, BigDecimal largoCm) {
-        this.codigoSeguimiento = Objects.requireNonNull(codigoSeguimiento, "codigoSeguimiento");
-        this.cliente = Objects.requireNonNull(cliente, "cliente");
-        this.origen = Objects.requireNonNull(origen, "origen");
-        this.destino = Objects.requireNonNull(destino, "destino");
+        this.codigoSeguimiento = codigoSeguimiento;
+        this.cliente = cliente;
+        this.origen = origen;
+        this.destino = destino;
         this.pesoKg = requerirPositivo(pesoKg, "peso");
         this.altoCm = requerirPositivo(altoCm, "alto");
         this.anchoCm = requerirPositivo(anchoCm, "ancho");
@@ -141,8 +151,7 @@ public class Envio extends BaseEntity {
         cambiarEstado(EstadoEnvio.CANCELADO);
     }
 
-    public void asignarRepartidor(Repartidor nuevoRepartidor) {
-        Objects.requireNonNull(nuevoRepartidor, "repartidor");
+    public void asignarRepartidor(@NonNull Repartidor nuevoRepartidor) {
         if (estado != EstadoEnvio.PENDIENTE) {
             throw new BusinessRuleException(
                 "Solo se puede asignar repartidor a envíos PENDIENTES (estado actual: %s).".formatted(estado));
@@ -153,8 +162,7 @@ public class Envio extends BaseEntity {
         this.repartidor = nuevoRepartidor;
     }
 
-    public void cambiarEstado(EstadoEnvio nuevoEstado) {
-        Objects.requireNonNull(nuevoEstado, "nuevoEstado");
+    public void cambiarEstado(@NonNull EstadoEnvio nuevoEstado) {
         if (!estado.puedeTransicionarA(nuevoEstado)) {
             throw new InvalidStateTransitionException(estado, nuevoEstado);
         }
@@ -177,13 +185,8 @@ public class Envio extends BaseEntity {
         return valor;
     }
 
-    public String getCodigoSeguimiento() { return codigoSeguimiento; }
-    public Cliente getCliente() { return cliente; }
-    public Repartidor getRepartidor() { return repartidor; }
-    public Direccion getOrigen() { return origen; }
-    public Direccion getDestino() { return destino; }
-    public BigDecimal getPesoKg() { return pesoKg; }
-    public BigDecimal getTarifa() { return tarifa; }
-    public EstadoEnvio getEstado() { return estado; }
-    public List<HistorialEstado> getHistorial() { return Collections.unmodifiableList(historial); }
+    /** Vista de solo lectura: el historial solo se modifica a través de {@link #cambiarEstado}. */
+    public List<HistorialEstado> getHistorial() {
+        return Collections.unmodifiableList(historial);
+    }
 }

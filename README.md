@@ -66,6 +66,8 @@ classDiagram
     class Repartidor {
         -String nombre
         -TipoVehiculo tipoVehiculo
+        -String email
+        -String telefono
         -EstadoRepartidor estado
         +estaActivo() boolean
         +activar()
@@ -138,7 +140,7 @@ El script [`db/init/01-schema.sql`](db/init/01-schema.sql) crea las tablas y car
 **solo la primera vez** que se crea el volumen. Para empezar de cero:
 
 ```bash
-docker compose down -v
+docker compose down -v   # necesario si ya tenías la base creada: el repartidor ahora tiene email y teléfono
 ```
 
 ## 3. Desarrollo local (app desde el IDE)
@@ -184,7 +186,8 @@ src/main/java/ar/edu/unju/fi/logitrack/shipment
 ├── exception/    excepciones de dominio + GlobalExceptionHandler (RFC 7807)
 ├── mapper/       conversión entidad ⇄ DTO
 ├── repository/   Spring Data JPA
-└── service/      lógica de aplicación y transacciones
+└── service/      contratos (interfaces) de la lógica de aplicación
+    └── impl/     implementaciones (@Service) con las transacciones
 ```
 
 **El módulo Repartidores está completo como ejemplo de referencia** (DTO → Controller → Service →
@@ -218,22 +221,23 @@ Base: `/api/v1`. Errores en formato `application/problem+json`:
 
 | Método | Endpoint | Descripción | Estado |
 |---|---|---|---|
-| POST | `/repartidores` | Registrar repartidor | ✅ |
+| POST | `/repartidores` | Registrar repartidor (nombre, vehículo, email único y teléfono) | ✅ |
 | GET | `/repartidores?estado=ACTIVO` | Listar repartidores (todos o activos) | ✅ |
 | GET | `/repartidores/{id}` | Detalle de un repartidor | ✅ |
-| PATCH | `/repartidores/{id}/estado` | Activar o desactivar repartidor | ✅ (Issue 3) |
-| PUT | `/envios/{id}/repartidor` | Asignar repartidor `{ "repartidorId": "..." }` | ✅ (Issue 3) |
-| POST | `/envios` | Registrar envío (cliente, origen, destino, peso, medidas) | ⬜ |
-| GET | `/envios/{id}` | Consultar por id | ⬜ |
-| GET | `/envios/seguimiento/{codigo}` | Consultar por código de seguimiento | ⬜ |
-| GET | `/envios?estado=PENDIENTE` | Listar por estado | ⬜ |
-| PATCH | `/envios/{id}/estado` | Cambiar estado `{ "estado": "EN_RUTA" }` | ⬜ |
-| POST | `/envios/{id}/cancelacion` | Cancelar (solo PENDIENTE) | ⬜ |
-| GET | `/envios/{id}/historial` | Historial de estados | ⬜ |
+| PUT | `/repartidores/{id}` | Actualizar nombre, vehículo, email y teléfono | ✅ |
+| PATCH | `/repartidores/{id}/estado` | Activar o desactivar repartidor | ✅  |
+| PUT | `/envios/{id}/repartidor` | Asignar repartidor `{ "repartidorId": "..." }` | ✅  |
+| POST | `/envios` | Registrar envío (cliente, origen, destino, peso, medidas) | ✅ |
+| GET | `/envios/{id}` | Consultar por id | ✅ |
+| GET | `/envios/seguimiento/{codigo}` | Consultar por código de seguimiento | ✅ |
+| GET | `/envios?estado=PENDIENTE&repartidorId=...` | Listar por estado y/o por repartidor asignado (hoja de ruta) | ✅ |
+| PATCH | `/envios/{id}/estado` | Cambiar estado `{ "estado": "EN_RUTA" }` | ✅ |
+| POST | `/envios/{id}/cancelacion` | Cancelar (solo PENDIENTE) | ✅ |
+| GET | `/envios/{id}/historial` | Historial de estados | ✅ |
 
-### Demo de Endpoints (Issue 3)
+### Demo de Endpoints 
 
-El archivo [`http/repartidores.http`](http/repartidores.http) contiene todos los requests listos para ejecutar desde IntelliJ IDEA o VS Code (con la extensión REST Client):
+Los archivos [`http/envios.http`](http/envios.http) (ciclo de vida del envío) y [`http/repartidores.http`](http/repartidores.http) contienen todos los requests listos para ejecutar desde IntelliJ IDEA o VS Code (con la extensión REST Client):
 
 1. **Registrar repartidor:** `POST /api/v1/repartidores`
 2. **Listar disponibles:** `GET /api/v1/repartidores?estado=ACTIVO`

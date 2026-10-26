@@ -1,4 +1,4 @@
-package ar.edu.unju.fi.logitrack.shipment.service;
+package ar.edu.unju.fi.logitrack.shipment.service.impl;
 
 import ar.edu.unju.fi.logitrack.shipment.TestDataFactory;
 import ar.edu.unju.fi.logitrack.shipment.dto.repartidor.AsignacionResponse;
@@ -35,7 +35,7 @@ import static org.mockito.Mockito.when;
 
 /** Tests unitarios de la asignación de repartidores: cubren todas las reglas de negocio. */
 @ExtendWith(MockitoExtension.class)
-class AsignacionServiceTest {
+class AsignacionServiceImplTest {
 
     @Mock
     private EnvioRepository envioRepository;
@@ -43,7 +43,7 @@ class AsignacionServiceTest {
     @Mock
     private RepartidorRepository repartidorRepository;
 
-    private AsignacionService service;
+    private AsignacionServiceImpl service;
 
     private final UUID envioId = UUID.randomUUID();
     private final UUID repartidorId = UUID.randomUUID();
@@ -51,7 +51,7 @@ class AsignacionServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AsignacionService(
+        service = new AsignacionServiceImpl(
                 envioRepository, repartidorRepository, new AsignacionMapper(new RepartidorMapper()));
         cliente = TestDataFactory.cliente();
     }
@@ -108,7 +108,7 @@ class AsignacionServiceTest {
     @DisplayName("permite reasignar el envío a otro repartidor mientras siga PENDIENTE")
     void reasignaEnvioPendienteAOtroRepartidor() {
         Envio envio = crearEnvio(EstadoEnvio.PENDIENTE);
-        Repartidor repartidorAnterior = new Repartidor("Anterior", TipoVehiculo.AUTO);
+        Repartidor repartidorAnterior = new Repartidor("Anterior", TipoVehiculo.AUTO, "anterior@logitrack.test", "+54 388 400-3000");
         envio.asignarRepartidor(repartidorAnterior);
 
         Repartidor nuevo = crearRepartidorActivo();

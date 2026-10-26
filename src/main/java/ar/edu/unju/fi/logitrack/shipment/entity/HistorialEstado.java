@@ -9,14 +9,19 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.NonNull;
 
 import java.time.Instant;
-import java.util.Objects;
 
 /**
  * Registro de auditoría de un cambio de estado. Solo lo crea {@link Envio#cambiarEstado}
  * (constructor de paquete), así ningún cambio de estado queda sin historial.
  */
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "historial_estados")
 public class HistorialEstado extends BaseEntity {
@@ -37,30 +42,11 @@ public class HistorialEstado extends BaseEntity {
     @Column(name = "fecha_hora", nullable = false, updatable = false)
     private Instant fechaHora;
 
-    protected HistorialEstado() {
-        // requerido por JPA
-    }
-
-    HistorialEstado(Envio envio, EstadoEnvio estadoAnterior, EstadoEnvio estadoNuevo, Instant fechaHora) {
-        this.envio = Objects.requireNonNull(envio, "envio");
+    HistorialEstado(@NonNull Envio envio, EstadoEnvio estadoAnterior,
+                    @NonNull EstadoEnvio estadoNuevo, @NonNull Instant fechaHora) {
+        this.envio = envio;
         this.estadoAnterior = estadoAnterior;
-        this.estadoNuevo = Objects.requireNonNull(estadoNuevo, "estadoNuevo");
-        this.fechaHora = Objects.requireNonNull(fechaHora, "fechaHora");
-    }
-
-    public Envio getEnvio() {
-        return envio;
-    }
-
-    public EstadoEnvio getEstadoAnterior() {
-        return estadoAnterior;
-    }
-
-    public EstadoEnvio getEstadoNuevo() {
-        return estadoNuevo;
-    }
-
-    public Instant getFechaHora() {
-        return fechaHora;
+        this.estadoNuevo = estadoNuevo;
+        this.fechaHora = fechaHora;
     }
 }

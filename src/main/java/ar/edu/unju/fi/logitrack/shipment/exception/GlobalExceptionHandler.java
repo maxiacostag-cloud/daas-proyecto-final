@@ -1,7 +1,6 @@
 package ar.edu.unju.fi.logitrack.shipment.exception;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
@@ -21,10 +20,9 @@ import java.util.Map;
 /**
  * Traduce las excepciones de la aplicación a respuestas estandarizadas RFC 7807 (application/problem+json).
  */
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-
-    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     /**
      * Maneja excepciones cuando no se encuentra un recurso solicitado (HTTP 404).
@@ -40,6 +38,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessRuleException.class)
     public ResponseEntity<ProblemDetail> handleBusinessRule(BusinessRuleException ex) {
         return build(HttpStatus.UNPROCESSABLE_ENTITY, "Regla de negocio violada", ex.getMessage());
+    }
+
+    /**
+     * Maneja datos únicos que ya existen, como el email de un repartidor (HTTP 409).
+     */
+    @ExceptionHandler(DuplicateResourceException.class)
+    public ResponseEntity<ProblemDetail> handleDuplicate(DuplicateResourceException ex) {
+        return build(HttpStatus.CONFLICT, "Recurso duplicado", ex.getMessage());
     }
 
     /**
@@ -60,7 +66,7 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Captura errores de validación de DTOs (@Valid) alineando el título y mapa de errores al contrato del test (HTTP 400).
+     * Captura errores de validación de DTOs (@Valid) devolviendo el detalle por campo (HTTP 400).
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ProblemDetail> handleValidationExceptions(MethodArgumentNotValidException ex) {

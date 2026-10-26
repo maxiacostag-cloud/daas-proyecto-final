@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -23,13 +24,10 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/envios/{envioId}/repartidor")
 @Tag(name = "Asignación", description = "Asignación de repartidores a envíos")
+@RequiredArgsConstructor
 public class AsignacionController {
 
     private final AsignacionService asignacionService;
-
-    public AsignacionController(AsignacionService asignacionService) {
-        this.asignacionService = asignacionService;
-    }
 
     @PutMapping
     @Operation(summary = "Asignar un repartidor a un envío",

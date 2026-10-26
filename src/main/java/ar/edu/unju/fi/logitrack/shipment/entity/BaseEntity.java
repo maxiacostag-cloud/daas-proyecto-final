@@ -7,6 +7,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
 import jakarta.persistence.Version;
+import lombok.Getter;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -17,6 +18,7 @@ import java.util.UUID;
 /**
  * Superclase de todas las entidades: identificador UUID + campos de auditoría.
  */
+@Getter
 @MappedSuperclass
 @EntityListeners(AuditingEntityListener.class)
 public abstract class BaseEntity {
@@ -37,20 +39,4 @@ public abstract class BaseEntity {
     @LastModifiedDate
     @Column(name = "updated_at")
     private Instant updatedAt;
-
-    public UUID getId() {
-        return id;
-    }
-
-    public Long getVersion() {
-        return version;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public Instant getUpdatedAt() {
-        return updatedAt;
-    }
 }

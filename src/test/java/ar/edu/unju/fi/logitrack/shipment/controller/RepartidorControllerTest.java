@@ -6,6 +6,7 @@ import ar.edu.unju.fi.logitrack.shipment.dto.repartidor.RepartidorResponse;
 import ar.edu.unju.fi.logitrack.shipment.entity.enums.EstadoRepartidor;
 import ar.edu.unju.fi.logitrack.shipment.entity.enums.TipoVehiculo;
 import ar.edu.unju.fi.logitrack.shipment.exception.BusinessRuleException;
+import ar.edu.unju.fi.logitrack.shipment.exception.DuplicateResourceException;
 import ar.edu.unju.fi.logitrack.shipment.exception.ResourceNotFoundException;
 import ar.edu.unju.fi.logitrack.shipment.service.RepartidorService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,10 +25,12 @@ import java.util.UUID;
 import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -54,7 +57,7 @@ class RepartidorControllerTest {
 
         mockMvc.perform(post(URL)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new RepartidorRequest("Ana Torres", TipoVehiculo.MOTO))))
+                        .content(objectMapper.writeValueAsString(new RepartidorRequest("Ana Torres", TipoVehiculo.MOTO, "ana.torres@logitrack.test", "+54 388 400-5000"))))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", endsWith(URL + "/" + id)))
                 .andExpect(jsonPath("$.id").value(id.toString()))
@@ -159,8 +162,62 @@ class RepartidorControllerTest {
                 .andExpect(jsonPath("$.status").value(422));
     }
 
+    @Test
+    @DisplayName("POST: 400 si falta el email o tiene un formato inválido")
+    void registrar_emailInvalido_devuelve400() throws Exception {
+        mockMvc.perform(post(URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nombre\": \"Ana\", \"tipoVehiculo\": \"MOTO\", \"email\": \"no-es-un-email\", \"telefono\": \"\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.email").exists())
+                .andExpect(jsonPath("$.errors.telefono").exists());
+    }
+
+    @Test
+    @DisplayName("POST: 409 si el email ya pertenece a otro repartidor")
+    void registrar_emailDuplicado_devuelve409() throws Exception {
+        given(repartidorService.registrar(any()))
+                .willThrow(DuplicateResourceException.of("repartidor", "email", "ana.torres@logitrack.test"));
+
+        mockMvc.perform(post(URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new RepartidorRequest("Ana Torres", TipoVehiculo.MOTO, "ana.torres@logitrack.test", "+54 388 400-5000"))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Recurso duplicado"));
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/repartidores/{id}: 200 con los datos actualizados")
+    void actualizar_devuelve200() throws Exception {
+        UUID id = UUID.randomUUID();
+        given(repartidorService.actualizar(eq(id), any())).willReturn(respuesta(id, EstadoRepartidor.ACTIVO));
+
+        mockMvc.perform(put(URL + "/{id}", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new RepartidorRequest("Ana Torres", TipoVehiculo.MOTO, "ana.torres@logitrack.test", "+54 388 400-5000"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("ana.torres@logitrack.test"))
+                .andExpect(jsonPath("$.telefono").value("+54 388 400-5000"));
+    }
+
+    @Test
+    @DisplayName("PUT: 404 si el repartidor no existe")
+    void actualizar_inexistente_devuelve404() throws Exception {
+        UUID id = UUID.randomUUID();
+        given(repartidorService.actualizar(eq(id), any())).willThrow(ResourceNotFoundException.of("Repartidor", id));
+
+        mockMvc.perform(put(URL + "/{id}", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new RepartidorRequest("Ana Torres", TipoVehiculo.MOTO, "ana.torres@logitrack.test", "+54 388 400-5000"))))
+                .andExpect(status().isNotFound());
+    }
+
     private static RepartidorResponse respuesta(UUID id, EstadoRepartidor estado) {
         Instant ahora = Instant.now();
-        return new RepartidorResponse(id, "Ana Torres", TipoVehiculo.MOTO, estado, ahora, ahora);
+        return new RepartidorResponse(id, "Ana Torres", TipoVehiculo.MOTO,
+                "ana.torres@logitrack.test", "+54 388 400-5000", estado, ahora, ahora);
     }
 }

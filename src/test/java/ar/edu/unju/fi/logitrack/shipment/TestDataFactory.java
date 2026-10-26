@@ -4,11 +4,11 @@ import ar.edu.unju.fi.logitrack.shipment.entity.Cliente;
 import ar.edu.unju.fi.logitrack.shipment.entity.Direccion;
 import ar.edu.unju.fi.logitrack.shipment.entity.Envio;
 import ar.edu.unju.fi.logitrack.shipment.entity.Repartidor;
-import ar.edu.unju.fi.logitrack.shipment.entity.enums.EstadoEnvio;
 import ar.edu.unju.fi.logitrack.shipment.entity.enums.EstadoRepartidor;
 import ar.edu.unju.fi.logitrack.shipment.entity.enums.TipoVehiculo;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 /** Datos de prueba reutilizables para que los tests no repitan constructores largos. */
 public final class TestDataFactory {
@@ -33,7 +33,8 @@ public final class TestDataFactory {
     }
 
     public static Repartidor repartidor(String nombre, TipoVehiculo tipoVehiculo, EstadoRepartidor estado) {
-        Repartidor repartidor = new Repartidor(nombre, tipoVehiculo);
+        Repartidor repartidor = new Repartidor(
+            nombre, tipoVehiculo, UUID.randomUUID() + "@logitrack.test", "+54 388 400-2000");
         if (estado == EstadoRepartidor.INACTIVO) {
             repartidor.desactivar();
         }

@@ -12,4 +12,9 @@ public interface RepartidorRepository extends JpaRepository<Repartidor, UUID> {
     List<Repartidor> findByEstadoOrderByNombreAsc(EstadoRepartidor estado);
 
     List<Repartidor> findAllByOrderByNombreAsc();
+
+    boolean existsByEmailIgnoreCase(String email);
+
+    /** Para actualizar: el email puede repetirse solo si pertenece al mismo repartidor. */
+    boolean existsByEmailIgnoreCaseAndIdNot(String email, UUID id);
 }

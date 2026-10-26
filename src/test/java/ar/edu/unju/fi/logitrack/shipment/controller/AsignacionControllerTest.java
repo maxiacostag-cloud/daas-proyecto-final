@@ -47,7 +47,8 @@ class AsignacionControllerTest {
     void asignarDevuelve200() throws Exception {
         Instant ahora = Instant.now();
         RepartidorResponse repartidor = new RepartidorResponse(
-                repartidorId, "Juan Pérez", TipoVehiculo.MOTO, EstadoRepartidor.ACTIVO, ahora, ahora);
+                repartidorId, "Juan Pérez", TipoVehiculo.MOTO, "juan.perez@logitrack.test", "+54 388 400-2000",
+                EstadoRepartidor.ACTIVO, ahora, ahora);
         given(asignacionService.asignarRepartidor(envioId, repartidorId))
                 .willReturn(new AsignacionResponse(envioId, "LT-2026-000001", EstadoEnvio.PENDIENTE, repartidor));
 

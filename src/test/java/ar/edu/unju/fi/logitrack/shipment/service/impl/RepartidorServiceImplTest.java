@@ -1,4 +1,4 @@
-package ar.edu.unju.fi.logitrack.shipment.service;
+package ar.edu.unju.fi.logitrack.shipment.service.impl;
 
 import ar.edu.unju.fi.logitrack.shipment.TestDataFactory;
 import ar.edu.unju.fi.logitrack.shipment.dto.repartidor.RepartidorRequest;
@@ -8,6 +8,7 @@ import ar.edu.unju.fi.logitrack.shipment.entity.enums.EstadoEnvio;
 import ar.edu.unju.fi.logitrack.shipment.entity.enums.EstadoRepartidor;
 import ar.edu.unju.fi.logitrack.shipment.entity.enums.TipoVehiculo;
 import ar.edu.unju.fi.logitrack.shipment.exception.BusinessRuleException;
+import ar.edu.unju.fi.logitrack.shipment.exception.DuplicateResourceException;
 import ar.edu.unju.fi.logitrack.shipment.exception.ResourceNotFoundException;
 import ar.edu.unju.fi.logitrack.shipment.mapper.RepartidorMapper;
 import ar.edu.unju.fi.logitrack.shipment.repository.EnvioRepository;
@@ -35,7 +36,7 @@ import static org.mockito.Mockito.when;
 
 /** Test unitario de servicio con repositorios mockeados. */
 @ExtendWith(MockitoExtension.class)
-class RepartidorServiceTest {
+class RepartidorServiceImplTest {
 
     @Mock
     private RepartidorRepository repartidorRepository;
@@ -43,11 +44,11 @@ class RepartidorServiceTest {
     @Mock
     private EnvioRepository envioRepository;
 
-    private RepartidorService repartidorService;
+    private RepartidorServiceImpl repartidorService;
 
     @BeforeEach
     void setUp() {
-        repartidorService = new RepartidorService(repartidorRepository, envioRepository, new RepartidorMapper());
+        repartidorService = new RepartidorServiceImpl(repartidorRepository, envioRepository, new RepartidorMapper());
     }
 
     @Test
@@ -60,12 +61,14 @@ class RepartidorServiceTest {
             return repartidor;
         });
 
-        RepartidorResponse respuesta = repartidorService.registrar(new RepartidorRequest("  Ana Torres  ", TipoVehiculo.AUTO));
+        RepartidorResponse respuesta = repartidorService.registrar(new RepartidorRequest("  Ana Torres  ", TipoVehiculo.AUTO, "  Ana.Torres@Logitrack.test ", " +54 388 400-5000 "));
 
         ArgumentCaptor<Repartidor> captor = ArgumentCaptor.forClass(Repartidor.class);
         verify(repartidorRepository).save(captor.capture());
         assertThat(captor.getValue().getNombre()).isEqualTo("Ana Torres");
         assertThat(captor.getValue().getEstado()).isEqualTo(EstadoRepartidor.ACTIVO);
+        assertThat(captor.getValue().getEmail()).isEqualTo("ana.torres@logitrack.test");
+        assertThat(captor.getValue().getTelefono()).isEqualTo("+54 388 400-5000");
 
         assertThat(respuesta.id()).isEqualTo(idGenerado);
         assertThat(respuesta.tipoVehiculo()).isEqualTo(TipoVehiculo.AUTO);
@@ -161,6 +164,61 @@ class RepartidorServiceTest {
         when(repartidorRepository.findById(id)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> repartidorService.cambiarEstado(id, EstadoRepartidor.INACTIVO))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("registrar: rechaza un email que ya usa otro repartidor")
+    void registrar_emailDuplicado_lanzaConflicto() {
+        when(repartidorRepository.existsByEmailIgnoreCase("ana@logitrack.test")).thenReturn(true);
+
+        assertThatThrownBy(() -> repartidorService.registrar(
+                new RepartidorRequest("Ana Torres", TipoVehiculo.AUTO, "ana@logitrack.test", "+54 388 400-5000")))
+                .isInstanceOf(DuplicateResourceException.class)
+                .hasMessageContaining("ana@logitrack.test");
+
+        verify(repartidorRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("actualizar: reemplaza nombre, vehículo, email y teléfono")
+    void actualizar_cambiaLosDatos() {
+        Repartidor repartidor = TestDataFactory.repartidorActivo();
+        UUID id = UUID.randomUUID();
+        when(repartidorRepository.findById(id)).thenReturn(Optional.of(repartidor));
+        when(repartidorRepository.save(repartidor)).thenReturn(repartidor);
+
+        RepartidorResponse respuesta = repartidorService.actualizar(id,
+                new RepartidorRequest("Lucía F. Díaz", TipoVehiculo.AUTO, "Lucia.Diaz@logitrack.test", "+54 388 400-7000"));
+
+        assertThat(repartidor.getNombre()).isEqualTo("Lucía F. Díaz");
+        assertThat(repartidor.getTipoVehiculo()).isEqualTo(TipoVehiculo.AUTO);
+        assertThat(repartidor.getEmail()).isEqualTo("lucia.diaz@logitrack.test");
+        assertThat(respuesta.telefono()).isEqualTo("+54 388 400-7000");
+    }
+
+    @Test
+    @DisplayName("actualizar: rechaza un email que pertenece a otro repartidor")
+    void actualizar_emailDeOtro_lanzaConflicto() {
+        UUID id = UUID.randomUUID();
+        when(repartidorRepository.findById(id)).thenReturn(Optional.of(TestDataFactory.repartidorActivo()));
+        when(repartidorRepository.existsByEmailIgnoreCaseAndIdNot("otro@logitrack.test", id)).thenReturn(true);
+
+        assertThatThrownBy(() -> repartidorService.actualizar(id,
+                new RepartidorRequest("Lucía", TipoVehiculo.MOTO, "otro@logitrack.test", "+54 388 400-7000")))
+                .isInstanceOf(DuplicateResourceException.class);
+
+        verify(repartidorRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("actualizar: lanza 404 si el repartidor no existe")
+    void actualizar_inexistente_lanzaNotFound() {
+        UUID id = UUID.randomUUID();
+        when(repartidorRepository.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> repartidorService.actualizar(id,
+                new RepartidorRequest("Lucía", TipoVehiculo.MOTO, "lucia@logitrack.test", "+54 388 400-7000")))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 }
