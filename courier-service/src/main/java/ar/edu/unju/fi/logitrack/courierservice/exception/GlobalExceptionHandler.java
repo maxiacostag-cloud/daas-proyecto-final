@@ -29,11 +29,6 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.NOT_FOUND, "Recurso no encontrado", ex.getMessage());
     }
 
-    @ExceptionHandler(BusinessRuleException.class)
-    public ResponseEntity<ProblemDetail> handleBusinessRule(BusinessRuleException ex) {
-        return build(HttpStatus.UNPROCESSABLE_ENTITY, "Regla de negocio violada", ex.getMessage());
-    }
-
     @ExceptionHandler(DuplicateResourceException.class)
     public ResponseEntity<ProblemDetail> handleDuplicate(DuplicateResourceException ex) {
         return build(HttpStatus.CONFLICT, "Recurso duplicado", ex.getMessage());

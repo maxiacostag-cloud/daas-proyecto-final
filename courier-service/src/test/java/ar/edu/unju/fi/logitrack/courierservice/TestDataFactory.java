@@ -16,7 +16,7 @@ public final class TestDataFactory {
         Repartidor repartidor = new Repartidor(
                 nombre, tipoVehiculo, UUID.randomUUID() + "@logitrack.test", "+54 388 400-2000");
         if (estado == EstadoRepartidor.INACTIVO) {
-            repartidor.desactivar();
+            repartidor.cambiarEstado(EstadoRepartidor.INACTIVO);
         }
         return repartidor;
     }

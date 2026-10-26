@@ -12,10 +12,10 @@ public class RepartidorMapper {
 
     public Repartidor toEntity(RepartidorRequest request) {
         return new Repartidor(
-                request.nombre().trim(),
+                request.nombre(),
                 request.tipoVehiculo(),
-                request.email().trim(),
-                request.telefono().trim());
+                request.email(),
+                request.telefono());
     }
 
     public RepartidorResponse toResponse(Repartidor repartidor) {

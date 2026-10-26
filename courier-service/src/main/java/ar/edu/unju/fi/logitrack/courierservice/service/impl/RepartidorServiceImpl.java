@@ -28,9 +28,8 @@ public class RepartidorServiceImpl implements RepartidorService {
     @Override
     @Transactional
     public RepartidorResponse registrar(RepartidorRequest request) {
-        String email = request.email().trim();
-        if (repartidorRepository.existsByEmailIgnoreCase(email)) {
-            throw DuplicateResourceException.of("repartidor", "email", email);
+        if (repartidorRepository.existsByEmailIgnoreCase(request.email())) {
+            throw DuplicateResourceException.of("repartidor", "email", request.email());
         }
         Repartidor guardado = repartidorRepository.save(repartidorMapper.toEntity(request));
         return repartidorMapper.toResponse(guardado);
@@ -53,11 +52,10 @@ public class RepartidorServiceImpl implements RepartidorService {
     @Transactional
     public RepartidorResponse actualizar(UUID id, RepartidorRequest request) {
         Repartidor repartidor = obtenerEntidad(id);
-        String email = request.email().trim();
-        if (repartidorRepository.existsByEmailIgnoreCaseAndIdNot(email, id)) {
-            throw DuplicateResourceException.of("repartidor", "email", email);
+        if (repartidorRepository.existsByEmailIgnoreCaseAndIdNot(request.email(), id)) {
+            throw DuplicateResourceException.of("repartidor", "email", request.email());
         }
-        repartidor.actualizarDatos(request.nombre().trim(), request.tipoVehiculo(), email, request.telefono().trim());
+        repartidor.actualizarDatos(request.nombre(), request.tipoVehiculo(), request.email(), request.telefono());
         return repartidorMapper.toResponse(repartidorRepository.save(repartidor));
     }
 
