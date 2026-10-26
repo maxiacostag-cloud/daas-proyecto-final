@@ -25,9 +25,8 @@ centraliza la configuración.
 | [`security-service`](security-service) | `8083` | 🚧 Esqueleto (S2-05) | Usuarios, roles, BCrypt y emisión de JWT |
 | [`config-server`](config-server) | `8888` | 🚧 Esqueleto (S2-04) | Configuración centralizada con perfiles `dev`/`prod` |
 
-> El desacople real (quitar `Repartidor` de `shipment-service` y consumir `courier-service` por
-> REST) es la issue **S2-03**. Por eso el modelo de dominio que aparece más abajo todavía incluye
-> `Repartidor` dentro de `shipment-service`.
+> **S2-03 ya desacopló los repartidores:** `shipment-service` no tiene la entidad `Repartidor`; guarda
+> un `UUID repartidorId` y consulta la disponibilidad a `courier-service` por REST (`RestClient`).
 
 ---
 
@@ -113,11 +112,11 @@ request; el resultado se ve en la pestaña **Actions** del repositorio.
 | `EstadoEnvioTest` | Unitario | Matriz completa de transiciones de la máquina de estados |
 | `EnvioTest` | Unitario | Cálculo de tarifa, cancelación, asignación, historial |
 | `ShipmentServiceTest` | Unitario (Mockito) | Registro, consultas y reglas de negocio de envíos |
-| `RepartidorServiceImplTest` | Unitario (Mockito) | Registro, listados, activar/desactivar y regla de envíos en ruta |
-| `AsignacionServiceImplTest` | Unitario (Mockito) | Asignación, reasignación, repartidor inactivo y estados de envío |
-| `RepartidorRepositoryTest` / `EnvioRepositoryTest` | Integración (`@DataJpaTest`) | Mapeo JPA, UUID, auditoría, envíos en ruta |
-| `RepartidorControllerTest` / `AsignacionControllerTest` / `ShipmentControllerTest` | Integración (`@WebMvcTest`) | Contrato HTTP y códigos 200/201/400/404/409/422 |
-| `GestionEnviosIntegrationTest` / `GestionRepartidoresIntegrationTest` | Integración (`@SpringBootTest`) | Flujos completos e2e sobre H2 |
+| `AsignacionServiceImplTest` | Unitario (Mockito) | Asignación, reasignación, repartidor no disponible y estados de envío |
+| `CourierClientImplTest` | Unitario (`MockRestServiceServer`) | Contrato HTTP con courier-service: 200, 404 y 503 |
+| `EnvioRepositoryTest` | Integración (`@DataJpaTest`) | Mapeo JPA, UUID, auditoría y filtro por repartidor |
+| `AsignacionControllerTest` / `ShipmentControllerTest` | Integración (`@WebMvcTest`) | Contrato HTTP y códigos 200/201/400/404/409/422/503 |
+| `GestionEnviosIntegrationTest` | Integración (`@SpringBootTest`) | Flujo completo e2e sobre H2, con courier-service mockeado |
 | `ShipmentServiceApplicationTests` | `@SpringBootTest` | El contexto completo levanta |
 
 `courier-service` tiene su propia suite (unitarios, `@DataJpaTest`, `@WebMvcTest` e integración con
@@ -141,9 +140,10 @@ daas-proyecto-final
 ├── config-server/           Spring Cloud Config Server
 ├── shipment-service/        envíos (código del Sprint 1)
 │   └── src/main/java/ar/edu/unju/fi/logitrack/shipment
+│       ├── client/          cliente REST hacia courier-service (RestClient + disponibilidad)
 │       ├── config/          JPA auditing, OpenAPI
 │       ├── controller/      REST controllers (solo reciben/devuelven DTOs)
-│       ├── dto/             records de request/response (dto/envio, dto/repartidor)
+│       ├── dto/             records de request/response (dto/envio, dto/asignacion, dto/courier)
 │       ├── entity/          entidades JPA + enums + Value Object Direccion
 │       ├── exception/       excepciones de dominio + GlobalExceptionHandler (RFC 7807)
 │       ├── mapper/          conversión entidad ⇄ DTO
@@ -190,10 +190,12 @@ classDiagram
         -BigDecimal largoCm
         -BigDecimal tarifa
         -EstadoEnvio estado
+        -UUID repartidorId
         +calcularTarifa() BigDecimal
         +puedeCancelarse() boolean
         +cancelar()
-        +asignarRepartidor(Repartidor repartidor)
+        +validarAsignacionPosible()
+        +asignarRepartidor(UUID repartidorId)
         +cambiarEstado(EstadoEnvio nuevoEstado)
     }
 
@@ -211,17 +213,6 @@ classDiagram
         -Instant fechaHora
     }
 
-    class Repartidor {
-        -String nombre
-        -TipoVehiculo tipoVehiculo
-        -String email
-        -String telefono
-        -EstadoRepartidor estado
-        +estaActivo() boolean
-        +activar()
-        +desactivar()
-    }
-
     class EstadoEnvio {
         <<enumeration>>
         PENDIENTE
@@ -233,51 +224,32 @@ classDiagram
         +esFinal() boolean
     }
 
-    class EstadoRepartidor {
-        <<enumeration>>
-        ACTIVO
-        INACTIVO
-    }
-
-    class TipoVehiculo {
-        <<enumeration>>
-        BICICLETA
-        MOTO
-        AUTO
-        CAMIONETA
-    }
-
     BaseEntity <|-- Cliente
     BaseEntity <|-- Envio
-    BaseEntity <|-- Repartidor
     BaseEntity <|-- HistorialEstado
 
     Cliente "1" --> "*" Envio : realiza
-    Envio "*" --> "0..1" Repartidor : asignado_a
     Envio *-- "1" Direccion : origen
     Envio *-- "1" Direccion : destino
     Envio "1" *-- "*" HistorialEstado : historial
     Envio --> EstadoEnvio : estado
     HistorialEstado --> EstadoEnvio : estadoAnterior / estadoNuevo
-    Repartidor --> EstadoRepartidor : estado
-    Repartidor --> TipoVehiculo : tipoVehiculo
 ```
+
+`repartidorId` es solo un UUID: no hay relación JPA ni FK. El repartidor (nombre, vehículo, estado)
+vive en `courier-service`, que es el dueño de esos datos.
 
 Los cambios respecto del modelo guía del PDF están explicados en la [sección 8](#8-modelo-de-dominio--cambios-respecto-del-modelo-guía).
 
 ## 6. API (`shipment-service`)
 
 Base: `/api/v1`. Errores en formato `application/problem+json`:
-400 (validación / formato), 404 (no existe), 409 (dato duplicado), 422 (regla de negocio).
+400 (validación / formato), 404 (no existe), 409 (dato duplicado), 422 (regla de negocio) y
+503 (courier-service no disponible).
 
 | Método | Endpoint | Descripción | Estado |
 |---|---|---|---|
-| POST | `/repartidores` | Registrar repartidor (nombre, vehículo, email único y teléfono) | ✅ |
-| GET | `/repartidores?estado=ACTIVO` | Listar repartidores (todos o activos) | ✅ |
-| GET | `/repartidores/{id}` | Detalle de un repartidor | ✅ |
-| PUT | `/repartidores/{id}` | Actualizar nombre, vehículo, email y teléfono | ✅ |
-| PATCH | `/repartidores/{id}/estado` | Activar o desactivar repartidor | ✅ |
-| PUT | `/envios/{id}/repartidor` | Asignar repartidor `{ "repartidorId": "..." }` | ✅ |
+| PUT | `/envios/{id}/repartidor` | Asignar repartidor `{ "repartidorId": "..." }`; consulta courier-service | ✅ |
 | POST | `/envios` | Registrar envío (cliente, origen, destino, peso, medidas) | ✅ |
 | GET | `/envios/{id}` | Consultar por id | ✅ |
 | GET | `/envios/seguimiento/{codigo}` | Consultar por código de seguimiento | ✅ |
@@ -286,24 +258,23 @@ Base: `/api/v1`. Errores en formato `application/problem+json`:
 | POST | `/envios/{id}/cancelacion` | Cancelar (solo PENDIENTE) | ✅ |
 | GET | `/envios/{id}/historial` | Historial de estados | ✅ |
 
-> Los endpoints de `/repartidores` son transitorios: en **S2-03** se mueven a `courier-service` y
-> `shipment-service` pasa a consumirlos por REST.
+El CRUD de repartidores **no** vive acá: está en `courier-service` (ver más abajo). `shipment-service`
+solo guarda el `UUID` del repartidor asignado y consulta su disponibilidad por REST.
 
 ### Demo de endpoints
 
-Los archivos [`http/envios.http`](http/envios.http) (ciclo de vida del envío) y
-[`http/repartidores.http`](http/repartidores.http) contienen los requests listos para ejecutar
-desde IntelliJ IDEA o VS Code (extensión REST Client). Recordá apuntar a `localhost:8081`.
+Los archivos [`http/envios.http`](http/envios.http) (ciclo de vida del envío),
+[`http/repartidores.http`](http/repartidores.http) (asignación desde shipment) y
+[`http/couriers.http`](http/couriers.http) (alta y estado de repartidores) tienen los requests
+listos para ejecutar desde IntelliJ IDEA o VS Code (extensión REST Client). Para probar la
+asignación tienen que estar levantados `shipment-service` (8081) y `courier-service` (8082).
 
-1. **Registrar repartidor:** `POST /api/v1/repartidores`
-2. **Listar disponibles:** `GET /api/v1/repartidores?estado=ACTIVO`
-3. **Detalle de repartidor:** `GET /api/v1/repartidores/{id}`
-4. **Asignación exitosa:** `PUT /api/v1/envios/{envioId}/repartidor` con repartidor activo y envío en `PENDIENTE` (200 OK).
-5. **Reasignación:** sobre un envío que ya tiene repartidor pero sigue `PENDIENTE` (200 OK).
-6. **Rechazo por inactivo:** repartidor en `INACTIVO` (422).
-7. **Rechazo por estado de envío:** envío en `EN_RUTA` o `CANCELADO` (422).
-8. **Cambio de estado:** `PATCH /api/v1/repartidores/{id}/estado` a `INACTIVO` (200 OK si no tiene envíos en ruta).
-9. **Protección de repartidor:** desactivar un repartidor con envíos en `EN_RUTA` (422).
+1. **Asignación exitosa:** `PUT /api/v1/envios/{envioId}/repartidor` con repartidor activo y envío en `PENDIENTE` (200 OK).
+2. **Reasignación:** sobre un envío que ya tiene repartidor pero sigue `PENDIENTE` (200 OK).
+3. **Rechazo por inactivo:** repartidor en `INACTIVO` (422, lo informa courier-service).
+4. **Rechazo por estado de envío:** envío en `EN_RUTA` o `CANCELADO` (422).
+5. **Repartidor inexistente:** courier-service responde 404 y shipment lo propaga (404).
+6. **courier-service caído:** shipment responde 503.
 
 ### API de `courier-service` (8082)
 
@@ -322,15 +293,22 @@ Respuesta del endpoint de disponibilidad:
 { "repartidorId": "3f6c1a52-8e0b-4d7a-9c11-0a1b2c3d4e01", "estado": "ACTIVO", "disponible": true }
 ```
 
-`disponible` es `true` solo si el repartidor está `ACTIVO`. Las reglas que dependen de los envíos
-(por ejemplo, no desactivar a un repartidor con un envío `EN_RUTA`) quedan en `shipment-service`,
-que es quien conoce esa información. Demo: [`http/couriers.http`](http/couriers.http).
+`disponible` es `true` solo si el repartidor está `ACTIVO`. Demo: [`http/couriers.http`](http/couriers.http).
+
+> **Limitación conocida:** courier-service no conoce los envíos, así que no puede impedir que se
+> desactive un repartidor que tiene un envío `EN_RUTA`. La validación que existía en el `shipment-service`
+> monolítico se pierde en este desacople; si se necesita, hay que resolverla con un evento o con una
+> consulta de shipment a courier (follow-up).
 
 ## 7. Reglas de negocio (`shipment-service`)
 
 - Flujo: `PENDIENTE → EN_RUTA → ENTREGADO`, o `PENDIENTE → CANCELADO`. Cualquier otra transición → 422.
 - Solo se cancela en `PENDIENTE`.
-- Para pasar a `EN_RUTA` el envío debe tener repartidor; solo se asignan repartidores `ACTIVO` a envíos `PENDIENTE`.
+- Para pasar a `EN_RUTA` el envío debe tener `repartidorId`; solo se asignan repartidores que
+  courier-service informa como disponibles a envíos `PENDIENTE`.
+- La asignación consulta `GET /api/v1/repartidores/{id}/disponibilidad` con `courier.service.url`
+  (`COURIER_SERVICE_URL`, por defecto `http://localhost:8082`). Un 404 remoto se traduce a 404 y
+  un error de conexión o 5xx a 503.
 - **Tarifa** (provisoria, a validar con el equipo): `1500 + 450 × máx(peso real, peso volumétrico)`,
   con peso volumétrico = `alto × ancho × largo / 5000`. Las constantes están en `Envio`.
 
@@ -341,7 +319,7 @@ que es quien conoce esa información. Demo: [`http/couriers.http`](http/couriers
 | `BaseEntity` con `id` UUID, `createdAt`, `updatedAt` y `version` | Requisito de UUID + auditoría en **todas** las entidades; `@Version` evita actualizaciones perdidas |
 | Nueva entidad `HistorialEstado` | Trazabilidad de cada cambio de estado (estado anterior, nuevo, fecha/hora) |
 | `BigDecimal` en lugar de `Double` para peso, medidas y tarifa | Evitar errores de redondeo con dinero |
-| `TipoVehiculo` enum en lugar de `String` | Valores consistentes y validables |
+| `TipoVehiculo` enum (en `courier-service`) | Valores consistentes y validables |
 | `Direccion` como `@Embeddable` inmutable | Value Object sin identidad; se guarda en columnas `origen_*` / `destino_*` |
 | Máquina de estados en `EstadoEnvio.transicionesPermitidas()` | Una sola fuente de verdad para las transiciones |
 | `Envio` sin setters: `cambiarEstado()`, `cancelar()`, `asignarRepartidor()` | Las reglas no se pueden saltear; cada cambio de estado agrega historial automáticamente |

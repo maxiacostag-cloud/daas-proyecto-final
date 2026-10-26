@@ -47,7 +47,8 @@ Content-Type: application/json
 
 { "estado": "EN_RUTA" }
 
-### 6. Asignar repartidor activo (Lucía Fernández) -> 200
+### 6. Asignar repartidor activo (Lucía Fernández, vive en courier-service) -> 200
+### Requiere courier-service en el puerto 8082. Si está caído, responde 503.
 PUT {{host}}/api/v1/envios/{{envioId}}/repartidor
 Content-Type: application/json
 
