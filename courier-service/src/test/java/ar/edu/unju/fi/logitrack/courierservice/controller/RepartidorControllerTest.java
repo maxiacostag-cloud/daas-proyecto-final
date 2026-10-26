@@ -9,11 +9,11 @@ import ar.edu.unju.fi.logitrack.courierservice.entity.enums.TipoVehiculo;
 import ar.edu.unju.fi.logitrack.courierservice.exception.DuplicateResourceException;
 import ar.edu.unju.fi.logitrack.courierservice.exception.ResourceNotFoundException;
 import ar.edu.unju.fi.logitrack.courierservice.service.RepartidorService;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -45,7 +45,7 @@ class RepartidorControllerTest {
     private MockMvc mockMvc;
 
     @Autowired
-    private ObjectMapper objectMapper;
+    private JsonMapper objectMapper;
 
     @MockitoBean
     private RepartidorService repartidorService;
@@ -236,7 +236,7 @@ class RepartidorControllerTest {
     }
 
     private static String requestJson(String nombre, String email) throws Exception {
-        return new ObjectMapper().writeValueAsString(
+        return JsonMapper.builder().build().writeValueAsString(
                 new RepartidorRequest(nombre, TipoVehiculo.MOTO, email, "+54 388 400-5000"));
     }
 
