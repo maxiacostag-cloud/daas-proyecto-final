@@ -8,7 +8,7 @@ centraliza la configuración.
 | | |
 |---|---|
 | Lenguaje | Java 25 |
-| Framework | Spring Boot 3.5.7 · Spring Cloud 2025.0.0 |
+| Framework | Spring Boot 4.0.9 · Spring Cloud 2025.1.1 |
 | Base de datos | MySQL 8.4 (H2 en memoria para tests) |
 | Documentación | springdoc-openapi (Swagger UI) + Spring Cloud Config |
 | Tests | JUnit 5, Mockito, AssertJ, `@DataJpaTest`, `@WebMvcTest`, `@SpringBootTest` |
@@ -137,7 +137,7 @@ Tests de `courier-service`:
 
 ```
 daas-proyecto-final
-├── pom.xml                  agregador: Spring Boot 3.5.7 + Spring Cloud 2025.0.0
+├── pom.xml                  agregador: Spring Boot 4.0.9 + Spring Cloud 2025.1.1
 ├── config-server/           Spring Cloud Config Server
 ├── shipment-service/        envíos (código del Sprint 1)
 │   └── src/main/java/ar/edu/unju/fi/logitrack/shipment
