@@ -1,0 +1,14 @@
+server:
+  port: 8888
+
+spring:
+  application:
+    name: config-server
+  cloud:
+    discovery:
+      enabled: false # Desactiva el auto-descubrimiento para evitar el error de SimpleDiscoveryProperties
+    config:
+      server:
+        git:
+          uri: https://github.com/maxiacostag-cloud/daas-proyecto-final.git
+          default-label: develop

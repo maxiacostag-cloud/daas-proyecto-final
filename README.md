@@ -1,19 +1,157 @@
-# daas-proyecto-final · LogiTrack shipment-service
+# daas-proyecto-final · LogiTrack
 
-Microservicio del **Sprint 1** (Desarrollo y Arquitecturas Avanzadas de Software – FI UNJu 2026).
-Gestiona el ciclo de vida de los envíos, el historial de auditoría de estados y los repartidores.
+Proyecto de **Desarrollo y Arquitecturas Avanzadas de Software** (FI UNJu 2026) organizado como
+**monorepo Maven multi-módulo**. El **Sprint 1** entregó el microservicio de envíos completo; el
+**Sprint 2** desacopla la lógica en microservicios independientes, agrega seguridad con JWT y
+centraliza la configuración.
 
 | | |
 |---|---|
 | Lenguaje | Java 25 |
-| Framework | Spring Boot 3.5 (Web, Data JPA, Validation, Actuator) |
-| Base de datos | MySQL 8.4 (H2 en memoria solo para tests) |
-| Documentación | springdoc-openapi (Swagger UI) |
-| Tests | JUnit 5, Mockito, AssertJ, @DataJpaTest, @WebMvcTest |
-| Infra | Dockerfile multi-stage + docker-compose |
+| Framework | Spring Boot 3.5.7 · Spring Cloud 2025.0.0 |
+| Base de datos | MySQL 8.4 (H2 en memoria para tests) |
+| Documentación | springdoc-openapi (Swagger UI) + Spring Cloud Config |
+| Tests | JUnit 5, Mockito, AssertJ, `@DataJpaTest`, `@WebMvcTest`, `@SpringBootTest` |
+| Infra | Docker multi-stage + docker-compose (en progreso, S2-08/S2-09) |
 
 ---
-## Modelo de dominio
+
+## Módulos
+
+| Módulo | Puerto | Estado | Descripción |
+|---|---|---|---|
+| [`shipment-service`](shipment-service) | `8081` | ✅ Sprint 1 migrado (S2-01) | Ciclo de vida de envíos, historial de estados y asignación |
+| [`courier-service`](courier-service) | `8082` | 🚧 Esqueleto (S2-02) | Repartidores y disponibilidad |
+| [`security-service`](security-service) | `8083` | 🚧 Esqueleto (S2-05) | Usuarios, roles, BCrypt y emisión de JWT |
+| [`config-server`](config-server) | `8888` | 🚧 Esqueleto (S2-04) | Configuración centralizada con perfiles `dev`/`prod` |
+
+> El desacople real (quitar `Repartidor` de `shipment-service` y consumir `courier-service` por
+> REST) es la issue **S2-03**. Por eso el modelo de dominio que aparece más abajo todavía incluye
+> `Repartidor` dentro de `shipment-service`.
+
+---
+
+## 1. Requisitos
+
+- **JDK 25** (Temurin recomendado)
+- **Maven 3.9+** — o usar el wrapper incluido (`mvnw` / `mvnw.cmd`), que no requiere instalación
+- **Docker Desktop** (o Docker Engine + Compose v2), solo para la base de datos y para los
+  servicios containerizados del Sprint 2
+
+## 2. Build del proyecto completo
+
+```bash
+# Linux / macOS
+./mvnw -B clean verify
+
+# Windows (PowerShell)
+.\mvnw.cmd -B clean verify
+```
+
+El reactor compila los cuatro módulos y ejecuta toda la suite de tests. Para saltar los tests
+durante un build rápido:
+
+```bash
+./mvnw -B clean package -DskipTests
+```
+
+## 3. Levantar los servicios en local
+
+Cada microservicio se ejecuta desde su propio módulo:
+
+```powershell
+.\mvnw.cmd -pl shipment-service spring-boot:run    # http://localhost:8081
+.\mvnw.cmd -pl courier-service  spring-boot:run    # http://localhost:8082
+.\mvnw.cmd -pl security-service spring-boot:run    # http://localhost:8083
+.\mvnw.cmd -pl config-server    spring-boot:run    # http://localhost:8888
+```
+
+o directamente desde el IDE ejecutando cada clase `*Application`.
+
+| Recurso | URL |
+|---|---|
+| Swagger UI (shipment) | http://localhost:8081/swagger-ui.html |
+| OpenAPI JSON (shipment) | http://localhost:8081/v3/api-docs |
+| Health (shipment) | http://localhost:8081/actuator/health |
+| Config server | http://localhost:8888/shipment-service/default |
+
+### Base de datos
+
+```bash
+docker compose up -d mysql
+```
+
+- MySQL en `localhost:3307` · usuario `logitrack` / `logitrack`
+- Bases: `logitrack_shipments` (shipment) y `logitrack_couriers` (courier)
+- El script [`db/init/01-schema.sql`](db/init/01-schema.sql) crea el esquema de envíos **solo la
+  primera vez** que se crea el volumen. Para empezar de cero:
+
+  ```bash
+  docker compose down -v
+  ```
+
+Los valores por defecto se pueden pisar con variables de entorno: `DB_HOST`, `DB_PORT`, `DB_NAME`,
+`DB_USER`, `DB_PASSWORD`, `SERVER_PORT` y `CONFIG_SERVER_URL`. Ver [`.env.example`](.env.example).
+
+> `docker compose up --build` todavía construye la imagen única del Sprint 1: los Dockerfiles por
+> microservicio y el compose completo son **S2-08** y **S2-09**.
+
+## 4. Tests
+
+```bash
+./mvnw -B test                            # todos los módulos
+./mvnw -B -pl shipment-service test       # un módulo
+```
+
+La suite **no necesita MySQL ni Docker**: `shipment-service` usa H2 en memoria (modo MySQL) y
+`courier-service` desactiva Spring Cloud Config en el perfil de test. El pipeline de GitHub Actions
+([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) corre `mvn -B verify` en cada push y pull
+request; el resultado se ve en la pestaña **Actions** del repositorio.
+
+| Test (`shipment-service`) | Tipo | Qué valida |
+|---|---|---|
+| `EstadoEnvioTest` | Unitario | Matriz completa de transiciones de la máquina de estados |
+| `EnvioTest` | Unitario | Cálculo de tarifa, cancelación, asignación, historial |
+| `ShipmentServiceTest` | Unitario (Mockito) | Registro, consultas y reglas de negocio de envíos |
+| `RepartidorServiceImplTest` | Unitario (Mockito) | Registro, listados, activar/desactivar y regla de envíos en ruta |
+| `AsignacionServiceImplTest` | Unitario (Mockito) | Asignación, reasignación, repartidor inactivo y estados de envío |
+| `RepartidorRepositoryTest` / `EnvioRepositoryTest` | Integración (`@DataJpaTest`) | Mapeo JPA, UUID, auditoría, envíos en ruta |
+| `RepartidorControllerTest` / `AsignacionControllerTest` / `ShipmentControllerTest` | Integración (`@WebMvcTest`) | Contrato HTTP y códigos 200/201/400/404/409/422 |
+| `GestionEnviosIntegrationTest` / `GestionRepartidoresIntegrationTest` | Integración (`@SpringBootTest`) | Flujos completos e2e sobre H2 |
+| `ShipmentServiceApplicationTests` | `@SpringBootTest` | El contexto completo levanta |
+
+`courier-service`, `security-service` y `config-server` tienen por ahora su test de `contextLoads`;
+la cobertura propia de cada uno se agrega en sus issues (S2-02, S2-04, S2-05, S2-11).
+
+## 5. Estructura del repositorio
+
+```
+daas-proyecto-final
+├── pom.xml                  agregador: Spring Boot 3.5.7 + Spring Cloud 2025.0.0
+├── config-server/           Spring Cloud Config Server
+├── shipment-service/        envíos (código del Sprint 1)
+│   └── src/main/java/ar/edu/unju/fi/logitrack/shipment
+│       ├── config/          JPA auditing, OpenAPI
+│       ├── controller/      REST controllers (solo reciben/devuelven DTOs)
+│       ├── dto/             records de request/response (dto/envio, dto/repartidor)
+│       ├── entity/          entidades JPA + enums + Value Object Direccion
+│       ├── exception/       excepciones de dominio + GlobalExceptionHandler (RFC 7807)
+│       ├── mapper/          conversión entidad ⇄ DTO
+│       ├── repository/      Spring Data JPA
+│       └── service/         contratos de la lógica de aplicación
+│           └── impl/        implementaciones (@Service) con las transacciones
+├── courier-service/         repartidores (esqueleto)
+├── security-service/        autenticación y JWT (esqueleto)
+├── db/init/                 esquema y datos iniciales de MySQL
+└── http/                    requests de demo para IntelliJ / REST Client
+```
+
+El código del Sprint 1 se movió de `src/` a `shipment-service/src/` en **S2-01**, sin cambios de
+paquete (`ar.edu.unju.fi.logitrack.shipment`).
+
+---
+
+## Modelo de dominio (`shipment-service`)
 
 ```mermaid
 classDiagram
@@ -115,85 +253,57 @@ classDiagram
     Repartidor --> TipoVehiculo : tipoVehiculo
 ```
 
-Los cambios que hicimos respecto del modelo guía del PDF están explicados en la [sección 6](#6-modelo-de-dominio--cambios-respecto-del-modelo-guía).
+Los cambios respecto del modelo guía del PDF están explicados en la [sección 8](#8-modelo-de-dominio--cambios-respecto-del-modelo-guía).
 
----
+## 6. API (`shipment-service`)
 
-## 1. Requisitos
+Base: `/api/v1`. Errores en formato `application/problem+json`:
+400 (validación / formato), 404 (no existe), 409 (dato duplicado), 422 (regla de negocio).
 
-- **JDK 25** (Temurin recomendado)
-- **Maven 3.9+** — IntelliJ ya trae uno integrado; si no lo tenés instalado podés usar el del IDE
-- **Docker Desktop** (o Docker Engine + Compose v2)
+| Método | Endpoint | Descripción | Estado |
+|---|---|---|---|
+| POST | `/repartidores` | Registrar repartidor (nombre, vehículo, email único y teléfono) | ✅ |
+| GET | `/repartidores?estado=ACTIVO` | Listar repartidores (todos o activos) | ✅ |
+| GET | `/repartidores/{id}` | Detalle de un repartidor | ✅ |
+| PUT | `/repartidores/{id}` | Actualizar nombre, vehículo, email y teléfono | ✅ |
+| PATCH | `/repartidores/{id}/estado` | Activar o desactivar repartidor | ✅ |
+| PUT | `/envios/{id}/repartidor` | Asignar repartidor `{ "repartidorId": "..." }` | ✅ |
+| POST | `/envios` | Registrar envío (cliente, origen, destino, peso, medidas) | ✅ |
+| GET | `/envios/{id}` | Consultar por id | ✅ |
+| GET | `/envios/seguimiento/{codigo}` | Consultar por código de seguimiento | ✅ |
+| GET | `/envios?estado=PENDIENTE&repartidorId=...` | Listar por estado y/o por repartidor asignado (hoja de ruta) | ✅ |
+| PATCH | `/envios/{id}/estado` | Cambiar estado `{ "estado": "EN_RUTA" }` | ✅ |
+| POST | `/envios/{id}/cancelacion` | Cancelar (solo PENDIENTE) | ✅ |
+| GET | `/envios/{id}/historial` | Historial de estados | ✅ |
 
-## 2. Levantar todo con un comando
+> Los endpoints de `/repartidores` son transitorios: en **S2-03** se mueven a `courier-service` y
+> `shipment-service` pasa a consumirlos por REST.
 
-```bash
-docker compose up --build
-```
+### Demo de endpoints
 
-- API: http://localhost:8080
-- Swagger UI: http://localhost:8080/swagger-ui.html
-- Health: http://localhost:8080/actuator/health
-- MySQL: `localhost:3307` · usuario `logitrack` / `logitrack` · base `logitrack_shipments`
+Los archivos [`http/envios.http`](http/envios.http) (ciclo de vida del envío) y
+[`http/repartidores.http`](http/repartidores.http) contienen los requests listos para ejecutar
+desde IntelliJ IDEA o VS Code (extensión REST Client). Recordá apuntar a `localhost:8081`.
 
-El script [`db/init/01-schema.sql`](db/init/01-schema.sql) crea las tablas y carga datos de prueba
-**solo la primera vez** que se crea el volumen. Para empezar de cero:
+1. **Registrar repartidor:** `POST /api/v1/repartidores`
+2. **Listar disponibles:** `GET /api/v1/repartidores?estado=ACTIVO`
+3. **Detalle de repartidor:** `GET /api/v1/repartidores/{id}`
+4. **Asignación exitosa:** `PUT /api/v1/envios/{envioId}/repartidor` con repartidor activo y envío en `PENDIENTE` (200 OK).
+5. **Reasignación:** sobre un envío que ya tiene repartidor pero sigue `PENDIENTE` (200 OK).
+6. **Rechazo por inactivo:** repartidor en `INACTIVO` (422).
+7. **Rechazo por estado de envío:** envío en `EN_RUTA` o `CANCELADO` (422).
+8. **Cambio de estado:** `PATCH /api/v1/repartidores/{id}/estado` a `INACTIVO` (200 OK si no tiene envíos en ruta).
+9. **Protección de repartidor:** desactivar un repartidor con envíos en `EN_RUTA` (422).
 
-```bash
-docker compose down -v   # necesario si ya tenías la base creada: el repartidor ahora tiene email y teléfono
-```
+## 7. Reglas de negocio (`shipment-service`)
 
-## 3. Desarrollo local (app desde el IDE)
+- Flujo: `PENDIENTE → EN_RUTA → ENTREGADO`, o `PENDIENTE → CANCELADO`. Cualquier otra transición → 422.
+- Solo se cancela en `PENDIENTE`.
+- Para pasar a `EN_RUTA` el envío debe tener repartidor; solo se asignan repartidores `ACTIVO` a envíos `PENDIENTE`.
+- **Tarifa** (provisoria, a validar con el equipo): `1500 + 450 × máx(peso real, peso volumétrico)`,
+  con peso volumétrico = `alto × ancho × largo / 5000`. Las constantes están en `Envio`.
 
-```bash
-docker compose up -d mysql        # solo la base
-```
-
-Después ejecutar `ShipmentServiceApplication` desde el IDE (o `mvn spring-boot:run`).
-Los valores por defecto de `application.yml` ya apuntan a ese MySQL; se pueden pisar con variables
-de entorno (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`). Ver `.env.example`.
-
-## 4. Tests
-
-```bash
-mvn test
-```
-
-La suite **no necesita MySQL ni Docker**: usa H2 en memoria (modo MySQL). El pipeline de
-GitHub Actions (`.github/workflows/ci.yml`) corre `mvn verify` en cada push y pull request;
-el resultado se ve en la pestaña **Actions** del repositorio.
-
-| Test | Tipo | Qué valida |
-|---|---|---|
-| `EstadoEnvioTest` | Unitario | Matriz completa de transiciones de la máquina de estados |
-| `EnvioTest` | Unitario | Cálculo de tarifa, cancelación, asignación, historial |
-| `RepartidorServiceTest` | Unitario (Mockito) | Registro, listados, cambio de estado (activar/desactivar) y regla de envíos en ruta |
-| `AsignacionServiceTest` | Unitario (Mockito) | Asignación, reasignación, validaciones de repartidor inactivo y estados de envío |
-| `RepartidorRepositoryTest` / `EnvioRepositoryTest` | Integración (`@DataJpaTest`) | Mapeo JPA, UUID, auditoría, verificación de envíos en ruta |
-| `RepartidorControllerTest` | Integración (`@WebMvcTest`) | Contrato HTTP de repartidores (POST, GET, PATCH de estado), códigos 200/201/400/404/422 |
-| `AsignacionControllerTest` | Integración (`@WebMvcTest`) | Contrato HTTP de asignación (PUT), códigos 200/400/404/422 |
-| `GestionRepartidoresIntegrationTest` | Integración (`@SpringBootTest`) | Flujo completo e2e: registrar → listar → asignar a envío → reglas de negocio en H2 |
-| `ShipmentServiceApplicationTests` | `@SpringBootTest` | El contexto completo levanta |
-
-## 5. Estructura
-
-```
-src/main/java/ar/edu/unju/fi/logitrack/shipment
-├── config/       JPA auditing, OpenAPI
-├── controller/   REST controllers (solo reciben/devuelven DTOs)
-├── dto/          records de request/response, uno por módulo (dto/repartidor, dto/envio, ...)
-├── entity/       entidades JPA + enums + Value Object Direccion
-├── exception/    excepciones de dominio + GlobalExceptionHandler (RFC 7807)
-├── mapper/       conversión entidad ⇄ DTO
-├── repository/   Spring Data JPA
-└── service/      contratos (interfaces) de la lógica de aplicación
-    └── impl/     implementaciones (@Service) con las transacciones
-```
-
-**El módulo Repartidores está completo como ejemplo de referencia** (DTO → Controller → Service →
-Repository + tests de cada capa). Los módulos de envíos se implementan siguiendo el mismo patrón.
-
-## 6. Modelo de dominio — cambios respecto del modelo guía
+## 8. Modelo de dominio — cambios respecto del modelo guía
 
 | Cambio | Motivo |
 |---|---|
@@ -206,85 +316,35 @@ Repository + tests de cada capa). Los módulos de envíos se implementan siguien
 | `Envio` sin setters: `cambiarEstado()`, `cancelar()`, `asignarRepartidor()` | Las reglas no se pueden saltear; cada cambio de estado agrega historial automáticamente |
 | Código de seguimiento `LT-XXXXXXXXXX` (`TrackingCodeGenerator`) | Legible, sin caracteres ambiguos |
 
-**Reglas de negocio implementadas en el dominio**
-
-- Flujo: `PENDIENTE → EN_RUTA → ENTREGADO`, o `PENDIENTE → CANCELADO`. Cualquier otra transición → 422.
-- Solo se cancela en `PENDIENTE`.
-- Para pasar a `EN_RUTA` el envío debe tener repartidor; solo se asignan repartidores `ACTIVO` a envíos `PENDIENTE`.
-- **Tarifa** (provisoria, a validar con el equipo): `1500 + 450 × máx(peso real, peso volumétrico)`,
-  con peso volumétrico = `alto × ancho × largo / 5000`. Las constantes están en `Envio`.
-
-## 7. API
-
-Base: `/api/v1`. Errores en formato `application/problem+json`:
-400 (validación / formato), 404 (no existe), 409 (dato duplicado), 422 (regla de negocio).
-
-| Método | Endpoint | Descripción | Estado |
-|---|---|---|---|
-| POST | `/repartidores` | Registrar repartidor (nombre, vehículo, email único y teléfono) | ✅ |
-| GET | `/repartidores?estado=ACTIVO` | Listar repartidores (todos o activos) | ✅ |
-| GET | `/repartidores/{id}` | Detalle de un repartidor | ✅ |
-| PUT | `/repartidores/{id}` | Actualizar nombre, vehículo, email y teléfono | ✅ |
-| PATCH | `/repartidores/{id}/estado` | Activar o desactivar repartidor | ✅  |
-| PUT | `/envios/{id}/repartidor` | Asignar repartidor `{ "repartidorId": "..." }` | ✅  |
-| POST | `/envios` | Registrar envío (cliente, origen, destino, peso, medidas) | ✅ |
-| GET | `/envios/{id}` | Consultar por id | ✅ |
-| GET | `/envios/seguimiento/{codigo}` | Consultar por código de seguimiento | ✅ |
-| GET | `/envios?estado=PENDIENTE&repartidorId=...` | Listar por estado y/o por repartidor asignado (hoja de ruta) | ✅ |
-| PATCH | `/envios/{id}/estado` | Cambiar estado `{ "estado": "EN_RUTA" }` | ✅ |
-| POST | `/envios/{id}/cancelacion` | Cancelar (solo PENDIENTE) | ✅ |
-| GET | `/envios/{id}/historial` | Historial de estados | ✅ |
-
-### Demo de Endpoints 
-
-Los archivos [`http/envios.http`](http/envios.http) (ciclo de vida del envío) y [`http/repartidores.http`](http/repartidores.http) contienen todos los requests listos para ejecutar desde IntelliJ IDEA o VS Code (con la extensión REST Client):
-
-1. **Registrar repartidor:** `POST /api/v1/repartidores`
-2. **Listar disponibles:** `GET /api/v1/repartidores?estado=ACTIVO`
-3. **Detalle de repartidor:** `GET /api/v1/repartidores/{id}`
-4. **Asignación exitosa:** `PUT /api/v1/envios/{envioId}/repartidor` con repartidor activo y envío en `PENDIENTE` (200 OK).
-5. **Reasignación:** `PUT /api/v1/envios/{envioId}/repartidor` sobre un envío que ya tiene repartidor pero continúa `PENDIENTE` (200 OK).
-6. **Rechazo por inactivo:** Asignar repartidor en estado `INACTIVO` (422 Unprocessable Entity).
-7. **Rechazo por estado de envío:** Asignar a un envío en `EN_RUTA` o `CANCELADO` (422 Unprocessable Entity).
-8. **Cambio de estado:** `PATCH /api/v1/repartidores/{id}/estado` a `INACTIVO` (200 OK si no tiene envíos en ruta).
-9. **Protección de repartidor:** `PATCH /api/v1/repartidores/{id}/estado` a `INACTIVO` sobre un repartidor con envíos en `EN_RUTA` (422 Unprocessable Entity).
-
-## 8. Flujo de trabajo en Git
+## 9. Flujo de trabajo en Git
 
 - `main`: versión entregable, protegida (solo pull requests).
 - `develop`: integración del sprint.
-- `feature/<n°-issue>-<descripcion-corta>` → pull request hacia `develop`, con al menos una revisión.
+- `feature/<sprint>-<issue>-<descripcion-corta>` → pull request hacia `develop`, con al menos una revisión.
 - Commits estilo *Conventional Commits*: `feat: ...`, `fix: ...`, `test: ...`, `docs: ...`, `chore: ...`.
+- Una rama por issue; el número de issue va en el commit (`Closes #17`) para cerrarla al mergear.
 
-### Reparto sugerido de tareas (un issue + una rama por tarea)
+### Issues del Sprint 2
 
-| # | Tarea | Rama sugerida |
+| Issue | Tarea | Rama |
 |---|---|---|
-| 1 | Base del proyecto, Docker, dominio y módulo repartidores | `feature/1-base-proyecto` ✅ |
-| 2 | Registrar envío: `EnvioRequest/Response`, `EnvioMapper`, cliente buscar-o-crear por email, `ShipmentService.registrar`, `POST /envios` | `feature/2-registro-envios` |
-| 3 | Consultas: por id, por código de seguimiento, por estado | `feature/3-consultas-envios` |
-| 4 | Cambio de estado + endpoint de historial | `feature/4-estados-historial` |
-| 5 | Cancelación y asignación de repartidor | `feature/5-cancelacion-asignacion` |
-| 6 | `ShipmentServiceTest` (tarifa + máquina de estados) y `@WebMvcTest` de envíos | `feature/6-tests-envios` |
-| 7 | Revisión final, Swagger, README y guion del video | `feature/7-documentacion` |
+| S2-01 | Migrar el código del Sprint 1 al módulo `shipment-service` y unificar el build | `feature/s2-01-migrar-shipment-service` |
+| S2-02 | `courier-service`: repartidores y endpoint de disponibilidad | `feature/s2-02-courier-service` |
+| S2-03 | `shipment-service`: quitar `Repartidor` y cliente REST hacia courier | `feature/s2-03-shipment-rest-courier` |
+| S2-04 | `config-server`: configuración centralizada con perfiles `dev`/`prod` | `feature/s2-04-config-server` |
+| S2-05 | `security-service`: usuarios, roles, BCrypt y JWT | `feature/s2-05-security-service` |
+| S2-06 | Proteger endpoints con resource server JWT | `feature/s2-06-resource-server` |
+| S2-07 | Autorización por pertenencia (`CLIENTE` / `REPARTIDOR`) | `feature/s2-07-autorizacion` |
+| S2-08 | Dockerfiles multietapa por microservicio | `feature/s2-08-dockerfiles` |
+| S2-09 | `docker-compose` completo (4 servicios + MySQL) | `feature/s2-09-compose` |
+| S2-10 | Publicar las imágenes en Docker Hub | `feature/s2-10-docker-hub` |
+| S2-11 | Tests integrales y CI multi-módulo | `feature/s2-11-tests-ci` |
+| S2-12 | Demo E2E y README final | `feature/s2-12-demo-readme` |
 
-### Primer push (lo hace una sola persona)
+## 10. Créditos
 
-```bash
-git init -b main
-git add .
-git commit -m "chore: proyecto base daas-proyecto-final (shipment-service)"
-git remote add origin <URL-del-repo-en-GitHub>
-git push -u origin main
-git switch -c develop
-git push -u origin develop
-```
-
-Los demás:
-
-```bash
-git clone <URL-del-repo-en-GitHub>
-cd daas-proyecto-final
-git switch develop
-git switch -c feature/<n°>-<descripcion>
-```
+- **Brian Fabalos** — estructura multi-módulo Maven y esqueletos base de `shipment-service`,
+  `courier-service`, `security-service` y `config-server` (commit `464e276`, punto de partida del Sprint 2).
+- **Facundo Arancibia** — migración del Sprint 1 a `shipment-service`, unificación de Spring Boot y
+  Spring Cloud, y suite de tests del microservicio de envíos.
+- **Maximiliano Acosta** — coordinación del repositorio, tablero de issues y despliegue.

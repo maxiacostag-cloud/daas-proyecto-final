@@ -1,5 +1,5 @@
 # Integración continua con GitHub Actions:
-# compila y corre toda la suite de tests en cada push y pull request.
+# compila el reactor multi-módulo y corre la suite de tests en cada push y pull request.
 name: CI
 
 on:
@@ -30,4 +30,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: reportes-tests
-          path: target/surefire-reports/
+          # Un directorio por módulo: shipment-service/target/surefire-reports, etc.
+          path: "**/target/surefire-reports/"
+          if-no-files-found: ignore
