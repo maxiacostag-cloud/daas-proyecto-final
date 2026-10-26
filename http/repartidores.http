@@ -4,7 +4,7 @@
 ### Los UUIDs corresponden a los datos cargados en db/init/01-schema.sql
 ### =====================================================================
 
-@host = http://localhost:8080
+@host = http://localhost:8081
 
 ### ---------------------------------------------------------------------
 ### 1. REPARTIDORES: REGISTRO Y CONSULTAS
