@@ -21,7 +21,7 @@ centraliza la configuración.
 | Módulo | Puerto | Estado | Descripción |
 |---|---|---|---|
 | [`shipment-service`](shipment-service) | `8081` | ✅ Sprint 1 migrado (S2-01) | Ciclo de vida de envíos, historial de estados y asignación |
-| [`courier-service`](courier-service) | `8082` | 🚧 Esqueleto (S2-02) | Repartidores y disponibilidad |
+| [`courier-service`](courier-service) | `8082` | ✅ Repartidores y disponibilidad (S2-02) | Alta, consulta y disponibilidad de repartidores |
 | [`security-service`](security-service) | `8083` | 🚧 Esqueleto (S2-05) | Usuarios, roles, BCrypt y emisión de JWT |
 | [`config-server`](config-server) | `8888` | 🚧 Esqueleto (S2-04) | Configuración centralizada con perfiles `dev`/`prod` |
 
@@ -120,8 +120,18 @@ request; el resultado se ve en la pestaña **Actions** del repositorio.
 | `GestionEnviosIntegrationTest` / `GestionRepartidoresIntegrationTest` | Integración (`@SpringBootTest`) | Flujos completos e2e sobre H2 |
 | `ShipmentServiceApplicationTests` | `@SpringBootTest` | El contexto completo levanta |
 
-`courier-service`, `security-service` y `config-server` tienen por ahora su test de `contextLoads`;
-la cobertura propia de cada uno se agrega en sus issues (S2-02, S2-04, S2-05, S2-11).
+`courier-service` tiene su propia suite (unitarios, `@DataJpaTest`, `@WebMvcTest` e integración con
+H2). `security-service` y `config-server` tienen por ahora su test de `contextLoads`; la cobertura
+propia se agrega en S2-04, S2-05 y S2-11.
+
+Tests de `courier-service`:
+
+| Test | Tipo | Qué valida |
+|---|---|---|
+| `RepartidorServiceImplTest` | Unitario (Mockito) | Registro, listados, actualización, cambio de estado y disponibilidad |
+| `RepartidorControllerTest` | Integración (`@WebMvcTest`) | Contrato HTTP de los seis endpoints (200/201/400/404/409) |
+| `RepartidorRepositoryTest` | Integración (`@DataJpaTest`) | Mapeo JPA, UUID, auditoría, email único |
+| `GestionRepartidoresIntegrationTest` | Integración (`@SpringBootTest`) | Flujo completo y disponibilidad sobre H2 |
 
 ## 5. Estructura del repositorio
 
@@ -140,7 +150,7 @@ daas-proyecto-final
 │       ├── repository/      Spring Data JPA
 │       └── service/         contratos de la lógica de aplicación
 │           └── impl/        implementaciones (@Service) con las transacciones
-├── courier-service/         repartidores (esqueleto)
+├── courier-service/         repartidores + disponibilidad (puerto 8082)
 ├── security-service/        autenticación y JWT (esqueleto)
 ├── db/init/                 esquema y datos iniciales de MySQL
 └── http/                    requests de demo para IntelliJ / REST Client
@@ -294,6 +304,27 @@ desde IntelliJ IDEA o VS Code (extensión REST Client). Recordá apuntar a `loca
 7. **Rechazo por estado de envío:** envío en `EN_RUTA` o `CANCELADO` (422).
 8. **Cambio de estado:** `PATCH /api/v1/repartidores/{id}/estado` a `INACTIVO` (200 OK si no tiene envíos en ruta).
 9. **Protección de repartidor:** desactivar un repartidor con envíos en `EN_RUTA` (422).
+
+### API de `courier-service` (8082)
+
+| Método | Endpoint | Descripción |
+|---|---|---|
+| POST | `/api/v1/repartidores` | Registrar repartidor (queda `ACTIVO`) |
+| GET | `/api/v1/repartidores?estado=ACTIVO` | Listar repartidores; filtro opcional por estado |
+| GET | `/api/v1/repartidores/{id}` | Detalle de un repartidor |
+| PUT | `/api/v1/repartidores/{id}` | Actualizar nombre, vehículo, email y teléfono |
+| PATCH | `/api/v1/repartidores/{id}/estado` | Activar o desactivar |
+| GET | `/api/v1/repartidores/{id}/disponibilidad` | **Disponibilidad para shipment-service** |
+
+Respuesta del endpoint de disponibilidad:
+
+```json
+{ "repartidorId": "3f6c1a52-8e0b-4d7a-9c11-0a1b2c3d4e01", "estado": "ACTIVO", "disponible": true }
+```
+
+`disponible` es `true` solo si el repartidor está `ACTIVO`. Las reglas que dependen de los envíos
+(por ejemplo, no desactivar a un repartidor con un envío `EN_RUTA`) quedan en `shipment-service`,
+que es quien conoce esa información. Demo: [`http/couriers.http`](http/couriers.http).
 
 ## 7. Reglas de negocio (`shipment-service`)
 
