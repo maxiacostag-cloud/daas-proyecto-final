@@ -7,39 +7,35 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.4.3</version>
+        <version>3.5.7</version>
         <relativePath/>
     </parent>
 
     <groupId>ar.edu.unju.fi.logitrack</groupId>
     <artifactId>daas-proyecto-final</artifactId>
     <version>0.1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
     <name>daas-proyecto-final</name>
     <description>LogiTrack - Proyecto Agregador Multi-Módulo</description>
 
-    <!-- Corregido el cierre de la etiqueta packaging -->
-    <packaging>pom</packaging>
-
     <modules>
         <module>config-server</module>
-
         <module>shipment-service</module>
         <module>courier-service</module>
         <module>security-service</module>
-
     </modules>
 
     <properties>
         <java.version>25</java.version>
-        <spring-cloud.version>2024.0.0</spring-cloud.version>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <spring-cloud.version>2025.0.0</spring-cloud.version>
         <springdoc.version>2.8.13</springdoc.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
     <!-- Gestión centralizada de versiones para todos los submódulos -->
     <dependencyManagement>
         <dependencies>
-            <!-- Spring Cloud BOM -->
+            <!-- Spring Cloud BOM (compatible con Spring Boot 3.5.x) -->
             <dependency>
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-dependencies</artifactId>
@@ -58,20 +54,23 @@
     </dependencyManagement>
 
     <build>
-        <plugins>
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-            </plugin>
+        <pluginManagement>
+            <plugins>
+                <!-- Cada módulo ejecutable declara este plugin en su propio pom -->
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                </plugin>
 
-            <!-- Soporte para Mockito en versiones recientes de JDK -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <configuration>
-                    <argLine>-XX:+EnableDynamicAgentLoading -Xshare:off</argLine>
-                </configuration>
-            </plugin>
-        </plugins>
+                <!-- Soporte para Mockito en versiones recientes de JDK -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <configuration>
+                        <argLine>-XX:+EnableDynamicAgentLoading -Xshare:off</argLine>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
     </build>
 </project>
