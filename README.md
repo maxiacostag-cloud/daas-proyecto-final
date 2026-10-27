@@ -276,12 +276,12 @@ Base: `/api/v1`. Errores en formato `application/problem+json`:
 |---|---|---|---|
 | PUT | `/envios/{id}/repartidor` | Asignar repartidor `{ "repartidorId": "..." }`; consulta courier-service | `ADMIN` o `CLIENTE` |
 | POST | `/envios` | Registrar envío (cliente, origen, destino, peso, medidas) | `ADMIN` o `CLIENTE` |
-| GET | `/envios/{id}` | Consultar por id | autenticado |
-| GET | `/envios/seguimiento/{codigo}` | Consultar por código de seguimiento | autenticado |
-| GET | `/envios?estado=PENDIENTE&repartidorId=...` | Listar por estado y/o por repartidor asignado (hoja de ruta) | autenticado |
-| PATCH | `/envios/{id}/estado` | Cambiar estado `{ "estado": "EN_RUTA" }` | `ADMIN` o `REPARTIDOR` |
-| POST | `/envios/{id}/cancelacion` | Cancelar (solo PENDIENTE) | `ADMIN` o `CLIENTE` |
-| GET | `/envios/{id}/historial` | Historial de estados | autenticado |
+| GET | `/envios/{id}` | Consultar por id | autenticado (pertenencia) |
+| GET | `/envios/seguimiento/{codigo}` | Consultar por código de seguimiento | autenticado (pertenencia) |
+| GET | `/envios?estado=PENDIENTE&repartidorId=...` | Listar por estado y/o por repartidor asignado (hoja de ruta); el CLIENTE solo ve lo propio y el REPARTIDOR su hoja de ruta | autenticado (pertenencia) |
+| PATCH | `/envios/{id}/estado` | Cambiar estado `{ "estado": "EN_RUTA" }` | `ADMIN` o repartidor asignado |
+| POST | `/envios/{id}/cancelacion` | Cancelar (solo PENDIENTE) | `ADMIN` o cliente dueño |
+| GET | `/envios/{id}/historial` | Historial de estados | autenticado (pertenencia) |
 
 ### Seguridad (S2-06)
 
@@ -310,6 +310,45 @@ curl -X POST http://localhost:8083/api/v1/auth/login \
 curl http://localhost:8081/api/v1/envios -H "Authorization: Bearer <token>"
 ```
 
+### Autorización por pertenencia (S2-07)
+
+El rol no alcanza: además se verifica que el recurso **pertenezca** al usuario autenticado. Las
+reglas viven en `security/AutorizacionEnvio` (capa de servicio), así valen para todos los puntos de
+entrada, y una violación devuelve **403** con `ProblemDetail` (*Acceso denegado*).
+
+| Rol | Lectura (detalle, seguimiento, historial, listado) | Cancelar | Cambiar estado | Asignar repartidor |
+|---|---|---|---|---|
+| `ADMIN` | Todos los envíos | Sí | Sí | Sí |
+| `CLIENTE` | Solo los de su cliente | Solo los propios | No | Solo los propios |
+| `REPARTIDOR` | Solo los asignados a él | No | Solo los asignados a él | No |
+
+**Identidad del `CLIENTE`.** El `sub` del JWT (UUID del usuario de `security-service`) se guarda en
+`clientes.usuario_id`. Al registrar un envío, el cliente que se crea —o que se reutiliza por email—
+queda vinculado a ese usuario, y a partir de ahí solo el dueño puede verlo, cancelarlo o asignarle
+repartidor. Si el cliente ya pertenece a otro usuario, el registro responde 403.
+
+> **Simplificación:** el primer `CLIENTE` que usa un email sin dueño *reclama* el registro. Alcanza
+> para el alcance del sprint; un modelo completo necesitaría un alta de clientes explícita en
+> `security-service`.
+
+**Identidad del `REPARTIDOR`.** El token de un repartidor incluye el claim `repartidorId`, que se
+compara con `envios.repartidor_id`. El listado (`GET /envios`) queda atado a la hoja de ruta propia:
+pedir `?repartidorId=<otro>` devuelve 403, y un token sin el claim tampoco puede listar.
+
+```bash
+# CLIENTE: solo ve sus propios envíos
+curl http://localhost:8081/api/v1/envios -H "Authorization: Bearer <token-cliente>"
+
+# REPARTIDOR: solo los asignados a él
+curl http://localhost:8081/api/v1/envios -H "Authorization: Bearer <token-repartidor>"
+
+# Envío de otro cliente → 403
+curl -i http://localhost:8081/api/v1/envios/<id-ajeno> -H "Authorization: Bearer <token-cliente>"
+```
+
+Los tests que cubren la matriz son `AutorizacionEnvioTest` (unitario, por rol),
+`ShipmentOwnershipTest` (HTTP con JWT reales y H2) y `ShipmentSecurityTest` (401/403 por rol).
+
 El CRUD de repartidores **no** vive acá: está en `courier-service` (ver más abajo). `shipment-service`
 solo guarda el `UUID` del repartidor asignado y consulta su disponibilidad por REST.
 
@@ -320,6 +359,8 @@ Los archivos [`http/envios.http`](http/envios.http) (ciclo de vida del envío),
 [`http/couriers.http`](http/couriers.http) (alta y estado de repartidores) tienen los requests
 listos para ejecutar desde IntelliJ IDEA o VS Code (extensión REST Client). Para probar la
 asignación tienen que estar levantados `shipment-service` (8081) y `courier-service` (8082).
+[`http/pertenencia.http`](http/pertenencia.http) recorre el flujo completo de S2-07: alta y login
+de dos clientes y un repartidor, y los 403 por pertenencia.
 
 1. **Asignación exitosa:** `PUT /api/v1/envios/{envioId}/repartidor` con repartidor activo y envío en `PENDIENTE` (200 OK).
 2. **Reasignación:** sobre un envío que ya tiene repartidor pero sigue `PENDIENTE` (200 OK).
@@ -395,7 +436,7 @@ Respuesta del endpoint de disponibilidad:
 | S2-04 | `config-server`: configuración centralizada con perfiles `dev`/`prod` | `feature/s2-04-config-server` |
 | S2-05 | `security-service`: usuarios, roles, BCrypt y JWT | `feature/s2-05-security-service` |
 | S2-06 | Proteger endpoints con resource server JWT | `feature/s2-06-resource-server` |
-| S2-07 | Autorización por pertenencia (`CLIENTE` / `REPARTIDOR`) | `feature/s2-07-autorizacion` |
+| S2-07 | Autorización por pertenencia (`CLIENTE` / `REPARTIDOR`) | `feature/s2-07-autorizacion-pertenencia` |
 | S2-08 | Dockerfiles multietapa por microservicio | `feature/s2-08-dockerfiles` |
 | S2-09 | `docker-compose` completo (4 servicios + MySQL) | `feature/s2-09-compose` |
 | S2-10 | Publicar las imágenes en Docker Hub | `feature/s2-10-docker-hub` |

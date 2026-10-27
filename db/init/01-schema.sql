@@ -20,12 +20,16 @@ CREATE TABLE IF NOT EXISTS clientes (
     nombre      VARCHAR(120) NOT NULL,
     email       VARCHAR(150) NOT NULL,
     telefono    VARCHAR(30),
+    -- Usuario de security-service dueño del cliente (sub del JWT, S2-07). NULL = sin dueño.
+    usuario_id  CHAR(36),
     version     BIGINT,
     created_at  DATETIME(6)  NOT NULL,
     updated_at  DATETIME(6),
     CONSTRAINT pk_clientes PRIMARY KEY (id),
     CONSTRAINT uk_clientes_email UNIQUE (email)
 );
+
+CREATE INDEX idx_clientes_usuario ON clientes (usuario_id);
 
 -- ---------------------------------------------------------------------
 -- Envíos (origen y destino son Value Objects embebidos)
