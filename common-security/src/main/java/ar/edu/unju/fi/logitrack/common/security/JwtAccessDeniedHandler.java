@@ -1,11 +1,10 @@
-package ar.edu.unju.fi.logitrack.shipment.config;
+package ar.edu.unju.fi.logitrack.common.security;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.access.AccessDeniedHandler;
-import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
@@ -13,7 +12,6 @@ import java.io.IOException;
 /**
  * Responde 403 cuando el token es válido pero el rol no alcanza para la operación.
  */
-@Component
 public class JwtAccessDeniedHandler implements AccessDeniedHandler {
 
     private final ObjectMapper objectMapper;
