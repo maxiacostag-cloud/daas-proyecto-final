@@ -90,7 +90,11 @@ docker compose up -d mysql
   ```
 
 Los valores por defecto se pueden pisar con variables de entorno: `DB_HOST`, `DB_PORT`, `DB_NAME`,
-`DB_USER`, `DB_PASSWORD`, `SERVER_PORT` y `CONFIG_SERVER_URL`. Ver [`.env.example`](.env.example).
+`DB_USER`, `DB_PASSWORD`, `SERVER_PORT`, `CONFIG_SERVER_URL` y `JWT_SECRET`. Ver [`.env.example`](.env.example).
+
+> **S2-06:** `shipment-service` y `courier-service` validan los JWT emitidos por `security-service`
+> con firma **HS256** y el secreto compartido `JWT_SECRET`. Si se levantan a mano, los tres servicios
+> tienen que usar el mismo valor (el default ya coincide, así que en local no hace falta configurarlo).
 
 > `docker compose up --build` todavía construye la imagen única del Sprint 1: los Dockerfiles por
 > microservicio y el compose completo son **S2-08** y **S2-09**.
@@ -121,7 +125,8 @@ El mismo `verify` genera el reporte de cobertura **JaCoCo** de cada módulo
 | `EnvioRepositoryTest` | Integración (`@DataJpaTest`) | Mapeo JPA, UUID, auditoría y filtro por repartidor |
 | `AsignacionControllerTest` / `ShipmentControllerTest` | Integración (`@WebMvcTest`) | Contrato HTTP y códigos 200/201/400/404/409/422/503 |
 | `GestionEnviosIntegrationTest` | Integración (`@SpringBootTest`) | Flujo completo e2e sobre H2, con courier-service mockeado |
-| `FlujoCompletoHttpE2ETest` | Integración E2E (`@SpringBootTest` + `HttpServer`) | Registrar envío → asignar repartidor → `EN_RUTA` → `ENTREGADO` contra un courier-service falso por **HTTP real** (sin mockear el cliente) |
+| `FlujoCompletoHttpE2ETest` | Integración E2E (`@SpringBootTest` + `HttpServer`) | Registrar envío → asignar repartidor → `EN_RUTA` → `ENTREGADO` contra un courier-service falso por **HTTP real** (sin mockear el cliente); el courier falso exige `Authorization` y el test comprueba el **relay del token** |
+| `ShipmentSecurityTest` | Integración de seguridad (`@SpringBootTest`, JWT reales) | 401 sin token / vencido / firma inválida, 403 por rol, 200/201 con token válido y endpoints públicos |
 | `ShipmentServiceApplicationTests` | `@SpringBootTest` | El contexto completo levanta |
 
 `courier-service` tiene su propia suite (unitarios, `@DataJpaTest`, `@WebMvcTest` e integración con
@@ -135,8 +140,9 @@ Tests de `security-service` (perfil `test` con H2, sin MySQL ni Config Server):
 | `AuthControllerIntegrationTest` | Integración (`@SpringBootTest`) | Registro (201/409/422/400), login por username y email, 401 por credenciales o usuario inexistente, `/me` con token válido, sin token, inválido y expirado |
 | `SecurityServiceApplicationTests` | `@SpringBootTest` | El contexto levanta con el perfil `test` (H2) |
 
-Quedan pendientes para S2-11 los 401/403 por rol y pertenencia en `shipment-service` y
-`courier-service`, que llegan con S2-06 y S2-07.
+Queda pendiente para S2-07 la autorización por **pertenencia** (que un `CLIENTE` solo vea sus
+envíos y un `REPARTIDOR` solo los asignados); los 401/403 por rol de S2-06 ya están cubiertos por
+`ShipmentSecurityTest` y `CourierSecurityTest`.
 
 Todos los tests viven dentro de su módulo (`src/test/java`): no quedan tests del Sprint 1 huérfanos
 en la raíz del reactor.
@@ -149,6 +155,7 @@ Tests de `courier-service`:
 | `RepartidorControllerTest` | Integración (`@WebMvcTest`) | Contrato HTTP de los seis endpoints (200/201/400/404/409) |
 | `RepartidorRepositoryTest` | Integración (`@DataJpaTest`) | Mapeo JPA, UUID, auditoría, email único |
 | `GestionRepartidoresIntegrationTest` | Integración (`@SpringBootTest`) | Flujo completo y disponibilidad sobre H2 |
+| `CourierSecurityTest` | Integración de seguridad (`@SpringBootTest`, JWT reales) | 401 sin token / vencido / firma inválida, 403 al gestionar repartidores sin `ADMIN`, consultas autenticadas y endpoints públicos |
 
 ## 5. Estructura del repositorio
 
@@ -265,16 +272,43 @@ Base: `/api/v1`. Errores en formato `application/problem+json`:
 400 (validación / formato), 404 (no existe), 409 (dato duplicado), 422 (regla de negocio) y
 503 (courier-service no disponible).
 
-| Método | Endpoint | Descripción | Estado |
+| Método | Endpoint | Descripción | Rol mínimo |
 |---|---|---|---|
-| PUT | `/envios/{id}/repartidor` | Asignar repartidor `{ "repartidorId": "..." }`; consulta courier-service | ✅ |
-| POST | `/envios` | Registrar envío (cliente, origen, destino, peso, medidas) | ✅ |
-| GET | `/envios/{id}` | Consultar por id | ✅ |
-| GET | `/envios/seguimiento/{codigo}` | Consultar por código de seguimiento | ✅ |
-| GET | `/envios?estado=PENDIENTE&repartidorId=...` | Listar por estado y/o por repartidor asignado (hoja de ruta) | ✅ |
-| PATCH | `/envios/{id}/estado` | Cambiar estado `{ "estado": "EN_RUTA" }` | ✅ |
-| POST | `/envios/{id}/cancelacion` | Cancelar (solo PENDIENTE) | ✅ |
-| GET | `/envios/{id}/historial` | Historial de estados | ✅ |
+| PUT | `/envios/{id}/repartidor` | Asignar repartidor `{ "repartidorId": "..." }`; consulta courier-service | `ADMIN` o `CLIENTE` |
+| POST | `/envios` | Registrar envío (cliente, origen, destino, peso, medidas) | `ADMIN` o `CLIENTE` |
+| GET | `/envios/{id}` | Consultar por id | autenticado |
+| GET | `/envios/seguimiento/{codigo}` | Consultar por código de seguimiento | autenticado |
+| GET | `/envios?estado=PENDIENTE&repartidorId=...` | Listar por estado y/o por repartidor asignado (hoja de ruta) | autenticado |
+| PATCH | `/envios/{id}/estado` | Cambiar estado `{ "estado": "EN_RUTA" }` | `ADMIN` o `REPARTIDOR` |
+| POST | `/envios/{id}/cancelacion` | Cancelar (solo PENDIENTE) | `ADMIN` o `CLIENTE` |
+| GET | `/envios/{id}/historial` | Historial de estados | autenticado |
+
+### Seguridad (S2-06)
+
+`shipment-service` y `courier-service` son **resource servers**: no emiten tokens, solo validan los
+JWT que emite `security-service`.
+
+- **Firma:** HS256 con el secreto compartido `JWT_SECRET` (mismo default en los tres módulos, así que
+  en local funciona sin configuración extra).
+- **Roles:** el claim `roles` del token (`["ADMIN"]`, `["CLIENTE"]`, `["REPARTIDOR"]`) se traduce a
+  autoridades `ROLE_*`.
+- **Endpoints públicos** (sin token): `/actuator/health`, `/actuator/info`, `/v3/api-docs/**`,
+  `/swagger-ui/**` y `/error`.
+- **Resto:** requiere `Authorization: Bearer <token>`. Las respuestas de seguridad también son
+  `ProblemDetail` (`401` con título *No autorizado*, `403` con *Acceso denegado*).
+- **Token relay:** cuando `shipment-service` llama a `courier-service` (disponibilidad del repartidor)
+  reenvía el `Authorization` del request original, de modo que la llamada interna conserva la
+  identidad del usuario y courier sigue exigiendo token.
+
+```bash
+# 1. Obtener el token en security-service
+curl -X POST http://localhost:8083/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"usernameOrEmail":"admin.demo","password":"admin123"}'
+
+# 2. Usarlo en shipment o courier
+curl http://localhost:8081/api/v1/envios -H "Authorization: Bearer <token>"
+```
 
 El CRUD de repartidores **no** vive acá: está en `courier-service` (ver más abajo). `shipment-service`
 solo guarda el `UUID` del repartidor asignado y consulta su disponibilidad por REST.
@@ -296,14 +330,14 @@ asignación tienen que estar levantados `shipment-service` (8081) y `courier-ser
 
 ### API de `courier-service` (8082)
 
-| Método | Endpoint | Descripción |
-|---|---|---|
-| POST | `/api/v1/repartidores` | Registrar repartidor (queda `ACTIVO`) |
-| GET | `/api/v1/repartidores?estado=ACTIVO` | Listar repartidores; filtro opcional por estado |
-| GET | `/api/v1/repartidores/{id}` | Detalle de un repartidor |
-| PUT | `/api/v1/repartidores/{id}` | Actualizar nombre, vehículo, email y teléfono |
-| PATCH | `/api/v1/repartidores/{id}/estado` | Activar o desactivar |
-| GET | `/api/v1/repartidores/{id}/disponibilidad` | **Disponibilidad para shipment-service** |
+| Método | Endpoint | Descripción | Rol mínimo |
+|---|---|---|---|
+| POST | `/api/v1/repartidores` | Registrar repartidor (queda `ACTIVO`) | `ADMIN` |
+| GET | `/api/v1/repartidores?estado=ACTIVO` | Listar repartidores; filtro opcional por estado | autenticado |
+| GET | `/api/v1/repartidores/{id}` | Detalle de un repartidor | autenticado |
+| PUT | `/api/v1/repartidores/{id}` | Actualizar nombre, vehículo, email y teléfono | `ADMIN` |
+| PATCH | `/api/v1/repartidores/{id}/estado` | Activar o desactivar | `ADMIN` |
+| GET | `/api/v1/repartidores/{id}/disponibilidad` | **Disponibilidad para shipment-service** | autenticado |
 
 Respuesta del endpoint de disponibilidad:
 

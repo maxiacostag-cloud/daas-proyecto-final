@@ -13,6 +13,7 @@ import tools.jackson.databind.json.JsonMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -37,6 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /** Test de la capa web: el servicio está mockeado, se valida contrato HTTP y manejo de errores. */
 @WebMvcTest(RepartidorController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class RepartidorControllerTest {
 
     private static final String URL = "/api/v1/repartidores";

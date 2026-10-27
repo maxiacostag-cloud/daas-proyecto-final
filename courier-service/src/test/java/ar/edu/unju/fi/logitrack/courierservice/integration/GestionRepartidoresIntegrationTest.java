@@ -3,6 +3,7 @@ package ar.edu.unju.fi.logitrack.courierservice.integration;
 import ar.edu.unju.fi.logitrack.courierservice.entity.Repartidor;
 import ar.edu.unju.fi.logitrack.courierservice.entity.enums.EstadoRepartidor;
 import ar.edu.unju.fi.logitrack.courierservice.repository.RepartidorRepository;
+import ar.edu.unju.fi.logitrack.courierservice.security.MockMvcConSeguridad;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -10,7 +11,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
@@ -29,6 +32,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
+@Import(MockMvcConSeguridad.class)
+@WithMockUser(roles = "ADMIN")
 class GestionRepartidoresIntegrationTest {
 
     private static final String URL = "/api/v1/repartidores";
