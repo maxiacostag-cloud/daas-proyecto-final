@@ -125,9 +125,18 @@ El mismo `verify` genera el reporte de cobertura **JaCoCo** de cada módulo
 | `ShipmentServiceApplicationTests` | `@SpringBootTest` | El contexto completo levanta |
 
 `courier-service` tiene su propia suite (unitarios, `@DataJpaTest`, `@WebMvcTest` e integración con
-H2). `security-service` y `config-server` tienen por ahora su test de `contextLoads`; los tests de
-seguridad (login, token válido/expirado, 401/403 por rol y pertenencia) se suman en S2-11 cuando
-S2-05, S2-06 y S2-07 estén mergeadas, y la cobertura de `config-server` llega con S2-04.
+H2). `config-server` tiene por ahora su test de `contextLoads`; su cobertura llega con S2-04.
+
+Tests de `security-service` (perfil `test` con H2, sin MySQL ni Config Server):
+
+| Test | Tipo | Qué valida |
+|---|---|---|
+| `JwtUtilsTest` | Unitario | Firma, claims (`sub`, `roles`, `repartidorId`), token expirado, firma alterada y texto malformado |
+| `AuthControllerIntegrationTest` | Integración (`@SpringBootTest`) | Registro (201/409/422/400), login por username y email, 401 por credenciales o usuario inexistente, `/me` con token válido, sin token, inválido y expirado |
+| `SecurityServiceApplicationTests` | `@SpringBootTest` | El contexto levanta con el perfil `test` (H2) |
+
+Quedan pendientes para S2-11 los 401/403 por rol y pertenencia en `shipment-service` y
+`courier-service`, que llegan con S2-06 y S2-07.
 
 Todos los tests viven dentro de su módulo (`src/test/java`): no quedan tests del Sprint 1 huérfanos
 en la raíz del reactor.
