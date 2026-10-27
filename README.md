@@ -22,8 +22,9 @@ centraliza la configuración.
 |---|---|---|---|
 | [`shipment-service`](shipment-service) | `8081` | ✅ Sprint 1 migrado (S2-01) | Ciclo de vida de envíos, historial de estados y asignación |
 | [`courier-service`](courier-service) | `8082` | ✅ Repartidores y disponibilidad (S2-02) | Alta, consulta y disponibilidad de repartidores |
-| [`security-service`](security-service) | `8083` | 🚧 Esqueleto (S2-05) | Usuarios, roles, BCrypt y emisión de JWT |
+| [`security-service`](security-service) | `8083` | ✅ Usuarios, roles y JWT (S2-05) | Registro, login, BCrypt y emisión de JWT |
 | [`config-server`](config-server) | `8888` | 🚧 Esqueleto (S2-04) | Configuración centralizada con perfiles `dev`/`prod` |
+| [`common-security`](common-security) | — | ✅ Librería (S2-06) | Resource server JWT compartido: decoder HS256, roles y 401/403 |
 
 > **S2-03 ya desacopló los repartidores:** `shipment-service` no tiene la entidad `Repartidor`; guarda
 > un `UUID repartidorId` y consulta la disponibilidad a `courier-service` por REST (`RestClient`).
@@ -127,6 +128,8 @@ El mismo `verify` genera el reporte de cobertura **JaCoCo** de cada módulo
 | `GestionEnviosIntegrationTest` | Integración (`@SpringBootTest`) | Flujo completo e2e sobre H2, con courier-service mockeado |
 | `FlujoCompletoHttpE2ETest` | Integración E2E (`@SpringBootTest` + `HttpServer`) | Registrar envío → asignar repartidor → `EN_RUTA` → `ENTREGADO` contra un courier-service falso por **HTTP real** (sin mockear el cliente); el courier falso exige `Authorization` y el test comprueba el **relay del token** |
 | `ShipmentSecurityTest` | Integración de seguridad (`@SpringBootTest`, JWT reales) | 401 sin token / vencido / firma inválida, 403 por rol, 200/201 con token válido y endpoints públicos |
+| `ShipmentOwnershipTest` | Integración de seguridad (`@SpringBootTest`, JWT reales) | 16 casos de pertenencia: un `CLIENTE` solo ve y cancela lo propio; un `REPARTIDOR` solo su hoja de ruta |
+| `AutorizacionEnvioTest` | Unitario (JWT decodificado) | Reglas de lectura, cancelación, cambio de estado, asignación y filtro de listado por rol |
 | `ShipmentServiceApplicationTests` | `@SpringBootTest` | El contexto completo levanta |
 
 `courier-service` tiene su propia suite (unitarios, `@DataJpaTest`, `@WebMvcTest` e integración con
@@ -140,9 +143,9 @@ Tests de `security-service` (perfil `test` con H2, sin MySQL ni Config Server):
 | `AuthControllerIntegrationTest` | Integración (`@SpringBootTest`) | Registro (201/409/422/400), login por username y email, 401 por credenciales o usuario inexistente, `/me` con token válido, sin token, inválido y expirado |
 | `SecurityServiceApplicationTests` | `@SpringBootTest` | El contexto levanta con el perfil `test` (H2) |
 
-Queda pendiente para S2-07 la autorización por **pertenencia** (que un `CLIENTE` solo vea sus
-envíos y un `REPARTIDOR` solo los asignados); los 401/403 por rol de S2-06 ya están cubiertos por
-`ShipmentSecurityTest` y `CourierSecurityTest`.
+**S2-07** agregó la autorización por **pertenencia**: un `CLIENTE` solo ve, cancela y asigna sus
+propios envíos, y un `REPARTIDOR` solo opera los asignados a su `repartidorId`. La cubren
+`ShipmentOwnershipTest` (16 casos HTTP) y `AutorizacionEnvioTest` (10 casos unitarios).
 
 Todos los tests viven dentro de su módulo (`src/test/java`): no quedan tests del Sprint 1 huérfanos
 en la raíz del reactor.
@@ -162,21 +165,24 @@ Tests de `courier-service`:
 ```
 daas-proyecto-final
 ├── pom.xml                  agregador: Spring Boot 4.0.9 + Spring Cloud 2025.1.1
+├── common-security/         librería compartida del resource server JWT (S2-06)
+│   └── src/main/java/ar/edu/unju/fi/logitrack/common/security
 ├── config-server/           Spring Cloud Config Server
 ├── shipment-service/        envíos (código del Sprint 1)
 │   └── src/main/java/ar/edu/unju/fi/logitrack/shipment
 │       ├── client/          cliente REST hacia courier-service (RestClient + disponibilidad)
-│       ├── config/          JPA auditing, OpenAPI
+│       ├── config/          JPA auditing, OpenAPI y matriz de autorización
 │       ├── controller/      REST controllers (solo reciben/devuelven DTOs)
 │       ├── dto/             records de request/response (dto/envio, dto/asignacion, dto/courier)
 │       ├── entity/          entidades JPA + enums + Value Object Direccion
 │       ├── exception/       excepciones de dominio + GlobalExceptionHandler (RFC 7807)
 │       ├── mapper/          conversión entidad ⇄ DTO
 │       ├── repository/      Spring Data JPA
+│       ├── security/        identidad del JWT y autorización por pertenencia (S2-07)
 │       └── service/         contratos de la lógica de aplicación
 │           └── impl/        implementaciones (@Service) con las transacciones
 ├── courier-service/         repartidores + disponibilidad (puerto 8082)
-├── security-service/        autenticación y JWT (esqueleto)
+├── security-service/        autenticación y JWT (S2-05)
 ├── db/init/                 esquema y datos iniciales de MySQL
 └── http/                    requests de demo para IntelliJ / REST Client
 ```

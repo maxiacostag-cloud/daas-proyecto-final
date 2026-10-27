@@ -19,7 +19,7 @@
 | 4 | `UsuarioActual.usuarioId()` | Fallback a `Authentication.getName()` “para tests con `@WithMockUser`” | Línea 49; los únicos `@WithMockUser` son `ADMIN` y no necesitan `usuarioId` | Medio: la identidad podría salir de un principal que no es el JWT | **P1** |
 | 5 | `AuthServiceImpl` | Dos comentarios en maltés y uno redundante | Líneas 25, 45 y 50: “Kostruttur espliċitu…”, “Validación de regla…”, “Użu tal-Builder…” | Bajo: ruido y resto de otra autoría | **P2** |
 | 6 | `README.md` | Estados desactualizados: `security-service` y `config-server` figuran como “esqueleto”; S2-07 aparece como pendiente | Líneas 25, 26, 143-144 y 179 | Bajo: documentación engañosa | **P2** |
-| 7 | `.env.example` | Solo declara la base de shipment | Falta `DB_NAME` de courier/security y las URLs entre servicios | Bajo: el alta de contenedores queda incompleta | **P2** |
+| 7 | `.env.example` | Solo declara la base de shipment | Falta `DB_NAME` de courier/security y las URLs entre servicios | Bajo: depende del Compose completo | **No tocar** (S2-09) |
 | 8 | `JwtTestSupport` (shipment y courier) | Dos fixtures parecidos pero **no iguales**: courier no firma `sub` UUID ni `repartidorId` | `Compare-Object` muestra diferencias reales | Bajo: es duplicación de test aceptable; un `test-jar` agrega complejidad | **No tocar** |
 | 9 | Paquete `ar.edu.unju.fi.securityservice` | No sigue `ar.edu.unju.fi.logitrack.*` | `security-service/src/main/java/...` | Alto: renombrar toca clases, tests, `@ComponentScan` y documentación | **No tocar** |
 | 10 | `courier-service` usa `.properties` | El resto usa YAML | `application.properties` vs `application.yml` | Bajo | **No tocar** (S2-04 externaliza la configuración) |
@@ -71,6 +71,7 @@ Comentarios en maltés de `AuthServiceImpl`, README desactualizado y `.env.examp
 | Partir `AutorizacionEnvio` | Es una política de autorización cohesiva; partirla dispersa la regla de negocio. |
 | Reescribir `buscarSegunFiltros` con `Specification` | No reduce complejidad y agrega una dependencia de criterios dinámicos. |
 | `Dockerfile` raíz y Compose | Pertenecen a S2-08/S2-09, fuera de alcance. |
+| `.env.example` | Las variables de courier/security dependen del Compose completo (S2-09). |
 
 ---
 
