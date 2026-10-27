@@ -1,4 +1,4 @@
-package ar.edu.unju.fi.logitrack.shipment.config;
+package ar.edu.unju.fi.logitrack.common.security;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -13,7 +13,7 @@ import java.time.Instant;
 
 /**
  * Escribe un {@link ProblemDetail} (RFC 7807) en las respuestas de seguridad, para que un 401/403
- * tenga el mismo formato que el resto de los errores del microservicio.
+ * tenga el mismo formato que el resto de los errores de los microservicios.
  */
 final class ProblemDetailWriter {
 
