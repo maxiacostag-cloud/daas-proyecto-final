@@ -107,6 +107,10 @@ La suite **no necesita MySQL ni Docker**: `shipment-service` usa H2 en memoria (
 ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) corre `mvn -B verify` en cada push y pull
 request; el resultado se ve en la pestaña **Actions** del repositorio.
 
+El mismo `verify` genera el reporte de cobertura **JaCoCo** de cada módulo
+(`<módulo>/target/site/jacoco/index.html`) y GitHub Actions lo publica como artefacto
+`cobertura-jacoco`, junto a los `surefire-reports` de los tests.
+
 | Test (`shipment-service`) | Tipo | Qué valida |
 |---|---|---|
 | `EstadoEnvioTest` | Unitario | Matriz completa de transiciones de la máquina de estados |
@@ -117,11 +121,16 @@ request; el resultado se ve en la pestaña **Actions** del repositorio.
 | `EnvioRepositoryTest` | Integración (`@DataJpaTest`) | Mapeo JPA, UUID, auditoría y filtro por repartidor |
 | `AsignacionControllerTest` / `ShipmentControllerTest` | Integración (`@WebMvcTest`) | Contrato HTTP y códigos 200/201/400/404/409/422/503 |
 | `GestionEnviosIntegrationTest` | Integración (`@SpringBootTest`) | Flujo completo e2e sobre H2, con courier-service mockeado |
+| `FlujoCompletoHttpE2ETest` | Integración E2E (`@SpringBootTest` + `HttpServer`) | Registrar envío → asignar repartidor → `EN_RUTA` → `ENTREGADO` contra un courier-service falso por **HTTP real** (sin mockear el cliente) |
 | `ShipmentServiceApplicationTests` | `@SpringBootTest` | El contexto completo levanta |
 
 `courier-service` tiene su propia suite (unitarios, `@DataJpaTest`, `@WebMvcTest` e integración con
-H2). `security-service` y `config-server` tienen por ahora su test de `contextLoads`; la cobertura
-propia se agrega en S2-04, S2-05 y S2-11.
+H2). `security-service` y `config-server` tienen por ahora su test de `contextLoads`; los tests de
+seguridad (login, token válido/expirado, 401/403 por rol y pertenencia) se suman en S2-11 cuando
+S2-05, S2-06 y S2-07 estén mergeadas, y la cobertura de `config-server` llega con S2-04.
+
+Todos los tests viven dentro de su módulo (`src/test/java`): no quedan tests del Sprint 1 huérfanos
+en la raíz del reactor.
 
 Tests de `courier-service`:
 
