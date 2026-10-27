@@ -33,3 +33,12 @@ jobs:
           # Un directorio por módulo: shipment-service/target/surefire-reports, etc.
           path: "**/target/surefire-reports/"
           if-no-files-found: ignore
+
+      - name: Guardar reporte de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-jacoco
+          # Un reporte por módulo: shipment-service/target/site/jacoco/index.html, etc.
+          path: "**/target/site/jacoco/"
+          if-no-files-found: ignore

@@ -29,6 +29,7 @@
         <java.version>25</java.version>
         <spring-cloud.version>2025.1.1</spring-cloud.version>
         <springdoc.version>3.2.0</springdoc.version>
+        <jacoco.version>0.8.15</jacoco.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- Prefijo de las imágenes que se publican en Docker Hub (S2-08 / S2-10) -->
         <docker.image.prefix>maxiacostag-cloud</docker.image.prefix>
@@ -64,15 +65,41 @@
                     <artifactId>spring-boot-maven-plugin</artifactId>
                 </plugin>
 
-                <!-- Soporte para Mockito en versiones recientes de JDK -->
+                <!-- Soporte para Mockito en versiones recientes de JDK.
+                     @{argLine} lo completa jacoco:prepare-agent (S2-11). -->
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
                     <configuration>
-                        <argLine>-XX:+EnableDynamicAgentLoading -Xshare:off</argLine>
+                        <argLine>@{argLine} -XX:+EnableDynamicAgentLoading -Xshare:off</argLine>
                     </configuration>
                 </plugin>
             </plugins>
         </pluginManagement>
+
+        <plugins>
+            <!-- Cobertura de tests (S2-11): instrumenta la JVM y genera
+                 target/site/jacoco/ (HTML + XML) al final del ciclo verify. -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <executions>
+                    <execution>
+                        <id>preparar-agente</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>reporte-cobertura</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
     </build>
 </project>
