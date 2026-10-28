@@ -12,7 +12,7 @@ centraliza la configuración.
 | Base de datos | MySQL 8.4 (H2 en memoria para tests) |
 | Documentación | springdoc-openapi (Swagger UI) + Spring Cloud Config |
 | Tests | JUnit 5, Mockito, AssertJ, `@DataJpaTest`, `@WebMvcTest`, `@SpringBootTest` |
-| Infra | Docker multi-stage + docker-compose (en progreso, S2-08/S2-09) |
+| Infra | Dockerfile multietapa por microservicio · docker-compose · imágenes en Docker Hub (`macostag26`) |
 
 ---
 
@@ -23,11 +23,78 @@ centraliza la configuración.
 | [`shipment-service`](shipment-service) | `8081` | ✅ Sprint 1 migrado (S2-01) | Ciclo de vida de envíos, historial de estados y asignación |
 | [`courier-service`](courier-service) | `8082` | ✅ Repartidores y disponibilidad (S2-02) | Alta, consulta y disponibilidad de repartidores |
 | [`security-service`](security-service) | `8083` | ✅ Usuarios, roles y JWT (S2-05) | Registro, login, BCrypt y emisión de JWT |
-| [`config-server`](config-server) | `8888` | 🚧 Esqueleto (S2-04) | Configuración centralizada con perfiles `dev`/`prod` |
+| [`config-server`](config-server) | `8888` | ✅ Configuración centralizada (S2-04) | Lee [`logitrack-config`](https://github.com/maxiacostag-cloud/logitrack-config) con perfiles `dev`/`prod` |
 | [`common-security`](common-security) | — | ✅ Librería (S2-06) | Resource server JWT compartido: decoder HS256, roles y 401/403 |
 
 > **S2-03 ya desacopló los repartidores:** `shipment-service` no tiene la entidad `Repartidor`; guarda
 > un `UUID repartidorId` y consulta la disponibilidad a `courier-service` por REST (`RestClient`).
+
+---
+
+## Inicio rápido: todo el entorno con Docker (Sprint 2)
+
+Solo hace falta **Docker Desktop**. No se compila nada: las imágenes se descargan de Docker Hub.
+
+```bash
+git clone https://github.com/maxiacostag-cloud/daas-proyecto-final.git
+cd daas-proyecto-final
+
+# Crear el archivo de variables (no se sube al repositorio) y completar los secretos
+cp .env.example .env            # Windows: copy .env.example .env
+
+docker compose up -d
+docker compose ps               # en 1-2 minutos los 7 contenedores quedan "healthy"
+```
+
+En el `.env`, `DOCKERHUB_USER` tiene que ser `macostag26` (el usuario donde están publicadas las
+imágenes) e `IMAGE_TAG` la versión, `1.0.0`. Las claves (`DB_PASSWORD`, `MYSQL_ROOT_PASSWORD` y
+`JWT_SECRET`) se eligen al crear el entorno; `JWT_SECRET` necesita al menos 32 caracteres.
+
+### Imágenes publicadas (S2-10)
+
+| Imagen | Descarga |
+|---|---|
+| [`macostag26/logitrack-config-server:1.0.0`](https://hub.docker.com/r/macostag26/logitrack-config-server) | `docker pull macostag26/logitrack-config-server:1.0.0` |
+| [`macostag26/logitrack-security-service:1.0.0`](https://hub.docker.com/r/macostag26/logitrack-security-service) | `docker pull macostag26/logitrack-security-service:1.0.0` |
+| [`macostag26/logitrack-courier-service:1.0.0`](https://hub.docker.com/r/macostag26/logitrack-courier-service) | `docker pull macostag26/logitrack-courier-service:1.0.0` |
+| [`macostag26/logitrack-shipment-service:1.0.0`](https://hub.docker.com/r/macostag26/logitrack-shipment-service) | `docker pull macostag26/logitrack-shipment-service:1.0.0` |
+
+### Qué levanta el compose (S2-09)
+
+| Contenedor | Puerto en la PC | Para qué |
+|---|---|---|
+| `config-server` | `8888` | Entrega la configuración leída de `logitrack-config` |
+| `security-service` | `8083` | Usuarios, login y JWT |
+| `courier-service` | `8082` | Repartidores |
+| `shipment-service` | `8081` | Envíos (Swagger en http://localhost:8081/swagger-ui.html) |
+| `mysql-security` · `mysql-courier` · `mysql-shipment` | `3309` · `3308` · `3307` | Una base por microservicio |
+
+Los servicios arrancan con el perfil **`prod`** y se encuentran por **nombre de servicio** dentro de la
+red `logitrack-net` (nunca por `localhost`). Cada uno espera a que su base y el `config-server` estén
+sanos antes de arrancar.
+
+### Construir las imágenes desde el código
+
+Para probar cambios propios sin publicarlos, se suma `docker-compose.build.yml`, que construye cada
+imagen con el `Dockerfile` multietapa de su módulo (S2-08):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+```
+
+Para publicar una versión nueva en Docker Hub (después de `docker login`):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.build.yml build
+docker compose -f docker-compose.yml -f docker-compose.build.yml push
+```
+
+### Detener el entorno
+
+```bash
+docker compose down        # frena y borra los contenedores
+docker compose down -v     # además borra las bases (vuelven a crearse con los datos de prueba)
+```
 
 ---
 
@@ -68,37 +135,30 @@ Cada microservicio se ejecuta desde su propio módulo:
 
 o directamente desde el IDE ejecutando cada clase `*Application`.
 
+> **Configuración centralizada (S2-04):** primero hay que levantar el `config-server`; los demás
+> servicios toman de ahí su puerto, su base y sus URLs (perfil `dev`). Los secretos se pasan como
+> variables de entorno en la configuración de ejecución del IDE, por ejemplo:
+> `DB_PASSWORD=logitrack;JWT_SECRET=<una clave de al menos 32 caracteres>`.
+
 | Recurso | URL |
 |---|---|
 | Swagger UI (shipment) | http://localhost:8081/swagger-ui.html |
 | OpenAPI JSON (shipment) | http://localhost:8081/v3/api-docs |
 | Health (shipment) | http://localhost:8081/actuator/health |
-| Config server | http://localhost:8888/shipment-service/default |
+| Config server | http://localhost:8888/shipment-service/dev |
 
-### Base de datos
+### Bases de datos
+
+Para correr los servicios desde el IDE alcanza con levantar solo las bases:
 
 ```bash
-docker compose up -d mysql
+docker compose up -d mysql-shipment mysql-courier mysql-security
 ```
 
-- MySQL en `localhost:3307` · usuario `logitrack` / `logitrack`
-- Bases: `logitrack_shipments` (shipment) y `logitrack_couriers` (courier)
-- El script [`db/init/01-schema.sql`](db/init/01-schema.sql) crea el esquema de envíos **solo la
-  primera vez** que se crea el volumen. Para empezar de cero:
-
-  ```bash
-  docker compose down -v
-  ```
-
-Los valores por defecto se pueden pisar con variables de entorno: `DB_HOST`, `DB_PORT`, `DB_NAME`,
-`DB_USER`, `DB_PASSWORD`, `SERVER_PORT`, `CONFIG_SERVER_URL` y `JWT_SECRET`. Ver [`.env.example`](.env.example).
-
-> **S2-06:** `shipment-service` y `courier-service` validan los JWT emitidos por `security-service`
-> con firma **HS256** y el secreto compartido `JWT_SECRET`. Si se levantan a mano, los tres servicios
-> tienen que usar el mismo valor (el default ya coincide, así que en local no hace falta configurarlo).
-
-> `docker compose up --build` todavía construye la imagen única del Sprint 1: los Dockerfiles por
-> microservicio y el compose completo son **S2-08** y **S2-09**.
+- `logitrack_shipments` en `localhost:3307`, `logitrack_couriers` en `localhost:3308` y
+  `logitrack_security_db` en `localhost:3309`. El usuario y la clave son los del `.env`.
+- Los scripts de [`db/init`](db/init) cargan el esquema y los datos de prueba **solo la primera vez**
+  que se crea cada volumen. Para empezar de cero: `docker compose down -v`.
 
 ## 4. Tests
 
