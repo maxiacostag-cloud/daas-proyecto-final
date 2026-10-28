@@ -1,14 +1,23 @@
 server:
-  port: 8888
+  port: ${SERVER_PORT:8888}
 
 spring:
   application:
     name: config-server
   cloud:
     discovery:
-      enabled: false # Desactiva el auto-descubrimiento para evitar el error de SimpleDiscoveryProperties
+      enabled: false
     config:
       server:
         git:
-          uri: https://github.com/maxiacostag-cloud/daas-proyecto-final.git
-          default-label: develop
+          # Repositorio público con los archivos de configuración de cada microservicio.
+          uri: ${CONFIG_REPO_URI:https://github.com/maxiacostag-cloud/logitrack-config.git}
+          default-label: ${CONFIG_REPO_BRANCH:main}
+          clone-on-start: true
+          timeout: 10
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
