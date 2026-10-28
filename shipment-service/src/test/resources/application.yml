@@ -1,0 +1,29 @@
+# Configuración de tests: H2 en memoria en modo MySQL, sin dependencias externas.
+spring:
+  application:
+    name: shipment-service-test
+  cloud:
+    config:
+      enabled: false
+  datasource:
+    url: jdbc:h2:mem:logitrack;MODE=MySQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        type:
+          preferred_uuid_jdbc_type: CHAR
+
+# URL de courier-service para los tests de contexto (los unitarios usan mocks).
+courier:
+  service:
+    url: http://localhost:8082
+
+# Mismo secreto con el que los tests firman los JWT (ver JwtTestSupport).
+jwt:
+  secret: ClaveSecretaDeTestSuperSeguraParaTestsUnitariosLogiTrack2026!
