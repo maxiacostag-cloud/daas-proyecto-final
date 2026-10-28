@@ -1,0 +1,13 @@
+# Tests del config-server: no se clona el repositorio al arrancar,
+# así la suite no depende de tener internet ni de GitHub.
+spring:
+  application:
+    name: config-server
+  cloud:
+    discovery:
+      enabled: false
+    config:
+      server:
+        git:
+          uri: https://github.com/maxiacostag-cloud/logitrack-config.git
+          clone-on-start: false
