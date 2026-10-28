@@ -1,47 +1,163 @@
-# Levanta el entorno completo del Sprint 1 con un solo comando:
-#   docker compose up --build
-# Solo la base de datos (para correr la app desde el IDE):
-#   docker compose up -d mysql
+# =====================================================================
+# LogiTrack · entorno completo del Sprint 2 (S2-09)
+#
+# Usa las imágenes publicadas en Docker Hub (S2-10):
+#   docker compose up -d
+#
+# Para construir las imágenes desde el código, en lugar de descargarlas:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+#
+# Antes de levantarlo hay que copiar .env.example a .env y completar los secretos.
+# Entre contenedores no se usa localhost: cada servicio se encuentra por su nombre
+# dentro de la red logitrack-net (config-server, mysql-shipment, courier-service, etc.).
+# =====================================================================
+
+name: logitrack
+
+x-servicio-spring: &servicio-spring
+  restart: on-failure
+  mem_limit: 768m
+  networks:
+    - logitrack-net
+
+x-mysql: &mysql
+  image: mysql:8.4
+  restart: unless-stopped
+  mem_limit: 512m
+  networks:
+    - logitrack-net
+  healthcheck:
+    test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+    interval: 10s
+    timeout: 5s
+    retries: 10
+    start_period: 30s
 
 services:
-  mysql:
-    image: mysql:8.4
-    container_name: logitrack-mysql
-    restart: unless-stopped
+
+  # ---------------------------------------------------------------- bases de datos
+  # Una base por microservicio: ningún servicio lee las tablas de otro.
+
+  mysql-shipment:
+    <<: *mysql
+    container_name: logitrack-mysql-shipment
     environment:
-      MYSQL_DATABASE: ${DB_NAME:-logitrack_shipments}
+      MYSQL_DATABASE: logitrack_shipments
       MYSQL_USER: ${DB_USER:-logitrack}
-      MYSQL_PASSWORD: ${DB_PASSWORD:-logitrack}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en el archivo .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Falta MYSQL_ROOT_PASSWORD en el archivo .env}
       TZ: UTC
     ports:
-      - "${MYSQL_PORT:-3307}:3306"
+      - "3307:3306"
     volumes:
-      - mysql-data:/var/lib/mysql
-      - ./db/init:/docker-entrypoint-initdb.d:ro
-    healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
+      - mysql-shipment-data:/var/lib/mysql
+      - ./db/init/01-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
 
-  shipment-service:
-    build: .
-    image: logitrack/daas-proyecto-final:latest
-    container_name: logitrack-shipment-service
-    restart: unless-stopped
+  mysql-courier:
+    <<: *mysql
+    container_name: logitrack-mysql-courier
+    environment:
+      MYSQL_DATABASE: logitrack_couriers
+      MYSQL_USER: ${DB_USER:-logitrack}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en el archivo .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Falta MYSQL_ROOT_PASSWORD en el archivo .env}
+      TZ: UTC
+    ports:
+      - "3308:3306"
+    volumes:
+      - mysql-courier-data:/var/lib/mysql
+      - ./db/init/02-couriers.sql:/docker-entrypoint-initdb.d/02-couriers.sql:ro
+
+  mysql-security:
+    <<: *mysql
+    container_name: logitrack-mysql-security
+    environment:
+      MYSQL_DATABASE: logitrack_security_db
+      MYSQL_USER: ${DB_USER:-logitrack}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en el archivo .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Falta MYSQL_ROOT_PASSWORD en el archivo .env}
+      TZ: UTC
+    ports:
+      - "3309:3306"
+    volumes:
+      - mysql-security-data:/var/lib/mysql
+
+  # ---------------------------------------------------------------- configuración
+
+  config-server:
+    <<: *servicio-spring
+    image: ${DOCKERHUB_USER:-logitrack}/logitrack-config-server:${IMAGE_TAG:-1.0.0}
+    container_name: logitrack-config-server
+    environment:
+      CONFIG_REPO_URI: ${CONFIG_REPO_URI:-https://github.com/maxiacostag-cloud/logitrack-config.git}
+      CONFIG_REPO_BRANCH: ${CONFIG_REPO_BRANCH:-main}
+    ports:
+      - "8888:8888"
+
+  # ---------------------------------------------------------------- microservicios
+  # Todos arrancan con el perfil prod: toman su configuración del config-server
+  # (logitrack-config/<servicio>-prod.yml) y reciben los secretos por variables de entorno.
+
+  security-service:
+    <<: *servicio-spring
+    image: ${DOCKERHUB_USER:-logitrack}/logitrack-security-service:${IMAGE_TAG:-1.0.0}
+    container_name: logitrack-security-service
     depends_on:
-      mysql:
+      config-server:
+        condition: service_healthy
+      mysql-security:
         condition: service_healthy
     environment:
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_NAME: ${DB_NAME:-logitrack_shipments}
+      SPRING_PROFILES_ACTIVE: prod
+      CONFIG_SERVER_URL: http://config-server:8888
       DB_USER: ${DB_USER:-logitrack}
-      DB_PASSWORD: ${DB_PASSWORD:-logitrack}
+      DB_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en el archivo .env}
+      JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en el archivo .env}
     ports:
-      - "${APP_PORT:-8080}:8080"
+      - "8083:8083"
+
+  courier-service:
+    <<: *servicio-spring
+    image: ${DOCKERHUB_USER:-logitrack}/logitrack-courier-service:${IMAGE_TAG:-1.0.0}
+    container_name: logitrack-courier-service
+    depends_on:
+      config-server:
+        condition: service_healthy
+      mysql-courier:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      CONFIG_SERVER_URL: http://config-server:8888
+      DB_USER: ${DB_USER:-logitrack}
+      DB_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en el archivo .env}
+      JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en el archivo .env}
+    ports:
+      - "8082:8082"
+
+  shipment-service:
+    <<: *servicio-spring
+    image: ${DOCKERHUB_USER:-logitrack}/logitrack-shipment-service:${IMAGE_TAG:-1.0.0}
+    container_name: logitrack-shipment-service
+    depends_on:
+      config-server:
+        condition: service_healthy
+      mysql-shipment:
+        condition: service_healthy
+      courier-service:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      CONFIG_SERVER_URL: http://config-server:8888
+      DB_USER: ${DB_USER:-logitrack}
+      DB_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en el archivo .env}
+      JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en el archivo .env}
+    ports:
+      - "8081:8081"
+
+networks:
+  logitrack-net:
 
 volumes:
-  mysql-data:
+  mysql-shipment-data:
+  mysql-courier-data:
+  mysql-security-data:

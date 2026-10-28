@@ -1,0 +1,30 @@
+# =====================================================================
+# LogiTrack · construcción local de las imágenes (S2-09)
+#
+# Se suma al docker-compose.yml para construir las imágenes desde el código
+# en lugar de descargarlas de Docker Hub:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+#
+# Cada imagen se construye desde la raíz del repositorio con el Dockerfile de su módulo (S2-08).
+# =====================================================================
+
+services:
+  config-server:
+    build:
+      context: .
+      dockerfile: config-server/Dockerfile
+
+  security-service:
+    build:
+      context: .
+      dockerfile: security-service/Dockerfile
+
+  courier-service:
+    build:
+      context: .
+      dockerfile: courier-service/Dockerfile
+
+  shipment-service:
+    build:
+      context: .
+      dockerfile: shipment-service/Dockerfile
