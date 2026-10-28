@@ -1,0 +1,7 @@
+# .dockerignore de config-server (S2-08).
+# Docker lo usa automáticamente al construir con -f config-server/Dockerfile.
+# Se ignora todo y solo se deja pasar lo que la imagen necesita para compilar el módulo.
+*
+!pom.xml
+!*/pom.xml
+!config-server/src/main/
