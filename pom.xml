@@ -33,7 +33,7 @@
         <jacoco.version>0.8.15</jacoco.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- Prefijo de las imágenes que se publican en Docker Hub (S2-08 / S2-10) -->
-        <docker.image.prefix>maxiacostag-cloud</docker.image.prefix>
+        <docker.image.prefix>macostag26</docker.image.prefix>
     </properties>
 
     <!-- Gestión centralizada de versiones para todos los submódulos -->

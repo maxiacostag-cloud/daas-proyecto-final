@@ -121,7 +121,7 @@
                     </excludes>
                     <!-- Buildpack: docker build equivalente a "mvn spring-boot:build-image" -->
                     <image>
-                        <name>${docker.image.prefix}/${project.artifactId}</name>
+                        <name>${docker.image.prefix}/logitrack-${project.artifactId}</name>
                         <builder>paketobuildpacks/builder-jammy-base:latest</builder>
                     </image>
                 </configuration>
