@@ -31,6 +31,54 @@ centraliza la configuración.
 
 ---
 
+## Arquitectura del Sprint 2
+
+Cada microservicio tiene su propia base y solo habla con los demás por HTTP. Todos toman su
+configuración del `config-server` al arrancar, y la seguridad se resuelve con un JWT que firma
+`security-service` y validan los otros dos.
+
+```mermaid
+flowchart LR
+    usuario(["Usuario<br/>(IntelliJ .http, Swagger, curl)"])
+    repo[("GitHub<br/>logitrack-config")]
+
+    subgraph red["Red logitrack-net (docker-compose)"]
+        config["config-server<br/>:8888"]
+        security["security-service<br/>:8083"]
+        courier["courier-service<br/>:8082"]
+        shipment["shipment-service<br/>:8081"]
+        dbSec[("mysql-security<br/>:3309")]
+        dbCou[("mysql-courier<br/>:3308")]
+        dbShi[("mysql-shipment<br/>:3307")]
+    end
+
+    usuario -- "1. login" --> security
+    usuario -- "2. pedidos con el JWT" --> shipment
+    usuario -- "2. pedidos con el JWT" --> courier
+    shipment -- "disponibilidad del repartidor<br/>(reenvía el JWT)" --> courier
+    security --> dbSec
+    courier --> dbCou
+    shipment --> dbShi
+    config -- "lee la configuración" --> repo
+    security -. "pide su config" .-> config
+    courier -. "pide su config" .-> config
+    shipment -. "pide su config" .-> config
+```
+
+- **Login:** el usuario se registra o inicia sesión en `security-service`, que devuelve un JWT con su
+  rol (`ADMIN`, `CLIENTE` o `REPARTIDOR`).
+- **Validación del token:** `shipment-service` y `courier-service` revisan la firma del JWT con la
+  misma clave (`JWT_SECRET`), sin llamar a `security-service` en cada pedido.
+- **Entre servicios:** para asignar un repartidor, `shipment-service` consulta la disponibilidad a
+  `courier-service` por REST. Si courier no responde, shipment contesta 503.
+- **Configuración:** el `config-server` lee el repositorio
+  [`logitrack-config`](https://github.com/maxiacostag-cloud/logitrack-config) y le entrega a cada
+  servicio su configuración del perfil `dev` (IDE) o `prod` (Docker). Las claves no están en ese
+  repositorio: llegan por variables de entorno.
+- **Bases de datos:** una por servicio. Ningún servicio lee las tablas de otro.
+
+---
+
 ## Inicio rápido: todo el entorno con Docker (Sprint 2)
 
 Solo hace falta **Docker Desktop**. No se compila nada: las imágenes se descargan de Docker Hub.
@@ -115,7 +163,7 @@ docker compose down -v     # además borra las bases (vuelven a crearse con los 
 .\mvnw.cmd -B clean verify
 ```
 
-El reactor compila los cuatro módulos y ejecuta toda la suite de tests. Para saltar los tests
+El reactor compila los cinco módulos y ejecuta toda la suite de tests. Para saltar los tests
 durante un build rápido:
 
 ```bash
@@ -193,7 +241,8 @@ El mismo `verify` genera el reporte de cobertura **JaCoCo** de cada módulo
 | `ShipmentServiceApplicationTests` | `@SpringBootTest` | El contexto completo levanta |
 
 `courier-service` tiene su propia suite (unitarios, `@DataJpaTest`, `@WebMvcTest` e integración con
-H2). `config-server` tiene por ahora su test de `contextLoads`; su cobertura llega con S2-04.
+H2). `config-server` tiene su test de `contextLoads`, que levanta el servidor sin clonar el
+repositorio de configuración (`clone-on-start: false` en el perfil de test).
 
 Tests de `security-service` (perfil `test` con H2, sin MySQL ni Config Server):
 
@@ -354,8 +403,9 @@ Base: `/api/v1`. Errores en formato `application/problem+json`:
 `shipment-service` y `courier-service` son **resource servers**: no emiten tokens, solo validan los
 JWT que emite `security-service`.
 
-- **Firma:** HS256 con el secreto compartido `JWT_SECRET` (mismo default en los tres módulos, así que
-  en local funciona sin configuración extra).
+- **Firma:** HS256 con el secreto compartido `JWT_SECRET`, que llega por variable de entorno (en Docker
+  desde el `.env`; desde el IDE, en la configuración de ejecución). Los tres servicios tienen que usar
+  el mismo valor, de al menos 32 caracteres.
 - **Roles:** el claim `roles` del token (`["ADMIN"]`, `["CLIENTE"]`, `["REPARTIDOR"]`) se traduce a
   autoridades `ROLE_*`.
 - **Endpoints públicos** (sin token): `/actuator/health`, `/actuator/info`, `/v3/api-docs/**`,
@@ -483,6 +533,34 @@ Respuesta del endpoint de disponibilidad:
 | Máquina de estados en `EstadoEnvio.transicionesPermitidas()` | Una sola fuente de verdad para las transiciones |
 | `Envio` sin setters: `cambiarEstado()`, `cancelar()`, `asignarRepartidor()` | Las reglas no se pueden saltear; cada cambio de estado agrega historial automáticamente |
 | Código de seguimiento `LT-XXXXXXXXXX` (`TrackingCodeGenerator`) | Legible, sin caracteres ambiguos |
+
+## Checklist del Sprint 2
+
+Repaso de cada requisito de la consigna y dónde quedó resuelto. Todos los puntos están cumplidos,
+salvo el API Gateway, que queda fuera del alcance de este sprint.
+
+| Requisito de la consigna | Dónde está | Issue |
+|---|---|---|
+| shipment mantiene registro, consulta, cancelación, cambio de estado e historial | `ShipmentController`, `ShipmentServiceImpl` | S2-01 |
+| shipment deja de gestionar repartidores y guarda solo el `repartidorId` | Entidad `Envio` (sin relación JPA con repartidor) | S2-03 |
+| shipment consulta a courier por REST y maneja los errores de comunicación | `CourierClientImpl`: un 404 remoto da 404 y una caída da 503 | S2-03 |
+| courier registra, consulta, lista, actualiza y cambia el estado `ACTIVO`/`INACTIVO` | `RepartidorController` | S2-02 |
+| courier valida la disponibilidad del repartidor | `GET /api/v1/repartidores/{id}/disponibilidad` | S2-02 |
+| courier con MySQL propia, DTOs y manejo global de excepciones | `mysql-courier`, `dto/repartidor`, `GlobalExceptionHandler` | S2-02 |
+| security registra usuarios con contraseña encriptada (BCrypt) | `AuthController` (`/register`), `SecurityConfig` | S2-05 |
+| security autentica y emite un JWT firmado; endpoints de registro, login y usuario actual | `/register`, `/login`, `/me`, `JwtUtils` | S2-05 |
+| Roles `ADMIN`, `CLIENTE` y `REPARTIDOR` con Spring Security | Enum `Rol` y claim `roles` del JWT | S2-05 |
+| shipment y courier validan el JWT sin llamar a security en cada pedido | `common-security` (`ResourceServerSecurityConfig`) | S2-06 |
+| Autorización por rol y por pertenencia del recurso | `SecurityConfig` de cada servicio, `AutorizacionEnvio` | S2-06, S2-07 |
+| Config Server con `@EnableConfigServer` y repositorio Git | `config-server` + [`logitrack-config`](https://github.com/maxiacostag-cloud/logitrack-config) | S2-04 |
+| Puerto, nombre, MySQL, URLs, logging y seguridad no sensible externalizados, con perfiles `dev` y `prod` | Archivos `<servicio>.yml`, `<servicio>-dev.yml` y `<servicio>-prod.yml` de `logitrack-config` | S2-04 |
+| Los servicios usan `spring.config.import`; los secretos van por variables de entorno | `application.yml` de cada servicio, `.env.example` | S2-04 |
+| Dockerfile multietapa por servicio, con Java 25 y sin credenciales | `<módulo>/Dockerfile` y `<módulo>/Dockerfile.dockerignore` | S2-08 |
+| Compose con los 4 servicios y MySQL, sin `localhost` entre contenedores, con `docker compose up -d` | `docker-compose.yml` | S2-09 |
+| 4 imágenes en Docker Hub con etiqueta explícita; el compose funciona sin build local | `macostag26/logitrack-*:1.0.0` | S2-10 |
+| Tests unitarios, de integración, de seguridad y E2E, y CI multi-módulo | Sección 4 y [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | S2-11 |
+| Verificación de punta a punta, demo y README | Archivos de [`http/`](http) y este README | S2-12 |
+| API Gateway | Fuera del alcance del Sprint 2 | — |
 
 ## 9. Flujo de trabajo en Git
 
